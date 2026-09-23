@@ -22,12 +22,31 @@ export type Template = {
   pdfFileName: string;
   pdfData: string; // base64-encoded PDF bytes, so the template is self-contained in localStorage
   boxes: FieldBox[];
+  // Last-typed values for this template's fields, keyed by box id — persists
+  // across visits so leaving and coming back shows what was last filled in.
+  // Older saved templates predate this field, so treat a missing value the
+  // same as "no values yet" (empty object) everywhere it's read.
+  values?: Record<string, string>;
+  // People added via "Add & fill next person" for a multi-page download —
+  // persists across visits so navigating away mid-batch doesn't lose them.
+  // Older saved templates predate this field, so treat a missing value the
+  // same as "no one added yet" (empty array) everywhere it's read.
+  entries?: TemplateEntry[];
   createdAt: string;
   updatedAt: string;
 };
 
-export type EmployerProfile = {
-  companyName: string;
-  address: string;
-  tan: string;
+export type TemplateEntry = {
+  id: string;
+  values: Record<string, string>;
+};
+
+// A single employer-level fact (company name, TAN, ...) that doesn't vary
+// per person. The user can rename, add, and remove these freely from the
+// settings screen — `id` is what matching/storage keys off, `label` is
+// just what it's called on screen right now.
+export type EmployerField = {
+  id: string;
+  label: string;
+  value: string;
 };

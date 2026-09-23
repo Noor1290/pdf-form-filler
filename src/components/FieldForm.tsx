@@ -1,11 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { LockIcon, UnlockIcon } from "lucide-react";
+import {
+  FileTextIcon,
+  LockIcon,
+  Trash2Icon,
+  UnlockIcon,
+  UsersIcon,
+} from "lucide-react";
 import { Rnd } from "react-rnd";
 import { BoxStyleDialog } from "@/components/BoxStyleDialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { makeUnitConverters, type PixelRect } from "@/lib/boxGeometry";
-import { getEmployerProfile, matchEmployerField } from "@/lib/employerProfile";
+import {
+  makeUnitConverters,
+  sortBoxesByPosition,
+  type PixelRect,
+} from "@/lib/boxGeometry";
+import { getEmployerFields, matchEmployerField } from "@/lib/employerProfile";
 import {
   base64ToBytes,
   downloadPdfBytes,
@@ -15,9 +33,13 @@ import {
   renderPdfPageToCanvas,
 } from "@/lib/pdf";
 import { resizeHandleStyles } from "@/lib/rndHandleStyles";
-import { saveTemplateBoxes } from "@/lib/template";
+import {
+  saveTemplateBoxes,
+  saveTemplateEntries,
+  saveTemplateValues,
+} from "@/lib/template";
 import { validateFieldValue } from "@/lib/validation";
-import type { FieldBox, Template } from "@/types/template";
+import type { FieldBox, Template, TemplateEntry } from "@/types/template";
 
 type FieldFormProps = {
   template: Template;
@@ -28,6 +50,8 @@ type FieldFormProps = {
 const PAGE_WIDTH = 800;
 const PAGE_NUMBER = 1; // v1 only supports single-page templates (see roadmap)
 const REDRAW_DEBOUNCE_MS = 80;
+const VALUES_SAVE_DEBOUNCE_MS = 400;
+const ENTRIES_SAVE_DEBOUNCE_MS = 400;
 
 // The only fonts allowed for preview/export (see CLAUDE.md hard rules),
 // mapped to their closest canvas-safe equivalents.
@@ -36,6 +60,20 @@ const CSS_FONT_FAMILY: Record<FieldBox["fontFamily"], string> = {
   "Times-Roman": '"Times New Roman", Times, serif',
   Courier: '"Courier New", Courier, monospace',
 };
+
+// Employer-level fields (company name, TAN, ...) don't vary per person, so
+// this is reused both for the first person and every "next person" reset.
+function computeEmployerAutofill(boxes: FieldBox[]): Record<string, string> {
+  const fields = getEmployerFields();
+  const result: Record<string, string> = {};
+  for (const box of boxes) {
+    const match = matchEmployerField(box.name, fields);
+    if (match && match.value) {
+      result[box.id] = match.value;
+    }
+  }
+  return result;
+}
 
 export function FieldForm({
   template,
@@ -53,19 +91,26 @@ export function FieldForm({
     width: number;
     height: number;
   } | null>(null);
-  // Pre-fill any box whose name matches a known employer field (see roadmap
-  // Step 7) — still just normal editable state from here on.
-  const [values, setValues] = useState<Record<string, string>>(() => {
-    const profile = getEmployerProfile();
-    const initial: Record<string, string> = {};
-    for (const box of template.boxes) {
-      const field = matchEmployerField(box.name);
-      if (field && profile[field]) {
-        initial[box.id] = profile[field];
-      }
-    }
-    return initial;
-  });
+  // Start from employer autofill, then let whatever was last saved for this
+  // template (see roadmap Step 7) win — a saved value always wins, so
+  // autofill never overwrites something the user actually typed.
+  const [values, setValues] = useState<Record<string, string>>(() => ({
+    ...computeEmployerAutofill(template.boxes),
+    ...(template.values ?? {}),
+  }));
+
+  // Entries hold one filled-in person each, for exporting everyone as a
+  // single multi-page PDF (see roadmap). `values` above always represents
+  // whichever person is currently in the form; `activeEntryId` says whether
+  // that's an already-added entry (edits sync back to it) or a fresh,
+  // not-yet-added person. Restored from the template so navigating away
+  // mid-batch and coming back doesn't lose anyone already added.
+  const [entries, setEntries] = useState<TemplateEntry[]>(
+    () => template.entries ?? [],
+  );
+  const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
+  const [confirmingClearEntries, setConfirmingClearEntries] = useState(false);
 
   // Positions are locked by default so filling in values day-to-day never
   // risks an accidental drag (see roadmap Step 5).
@@ -75,6 +120,7 @@ export function FieldForm({
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [editingBoxId, setEditingBoxId] = useState<string | null>(null);
+  const [confirmingClear, setConfirmingClear] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,6 +157,11 @@ export function FieldForm({
     () => makeUnitConverters(pageSize?.width ?? 1, canvasSize?.width ?? 1),
     [pageSize, canvasSize],
   );
+
+  // The input list follows reading order (top-to-bottom, then left-to-right)
+  // rather than the order boxes were drawn in — `boxes` itself stays in
+  // creation order since that's what gets saved.
+  const orderedBoxes = useMemo(() => sortBoxesByPosition(boxes), [boxes]);
 
   // Redraw the text overlay whenever a value or box position changes, on a
   // separate canvas layered over the (already-rendered) PDF page — cheap
@@ -151,8 +202,117 @@ export function FieldForm({
     return () => clearTimeout(timeout);
   }, [values, boxes, canvasSize, pointToPixelRect, pointsToPixels]);
 
+  // Persist values with the template so leaving and coming back shows what
+  // was last typed, not a blank form — debounced the same way as the
+  // preview redraw so fast typing doesn't hit localStorage on every key.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      saveTemplateValues(template.id, values);
+    }, VALUES_SAVE_DEBOUNCE_MS);
+
+    return () => clearTimeout(timeout);
+  }, [template.id, values]);
+
+  // Persist the in-progress batch the same way — so navigating away after
+  // adding several people and coming back restores the full list, not just
+  // whatever was last typed into the form.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      saveTemplateEntries(template.id, entries);
+    }, ENTRIES_SAVE_DEBOUNCE_MS);
+
+    return () => clearTimeout(timeout);
+  }, [template.id, entries]);
+
+  // Background backstop: keeps the active entry roughly in sync while the
+  // user is mid-typing. The switch/add-next handlers below do their own
+  // synchronous flush (via functional setEntries) for the moments that
+  // actually matter, since this effect runs asynchronously after paint and
+  // can't be relied on to have caught up before the next click.
+  useEffect(() => {
+    if (activeEntryId === null) return;
+    setEntries((current) =>
+      current.map((entry) =>
+        entry.id === activeEntryId ? { ...entry, values } : entry,
+      ),
+    );
+  }, [activeEntryId, values]);
+
   function handleChange(boxId: string, value: string) {
     setValues((current) => ({ ...current, [boxId]: value }));
+  }
+
+  // The only way values go away — everything else (autofill, saving) only
+  // ever adds or preserves what's there.
+  function handleClearValues() {
+    setValues({});
+    setConfirmingClear(false);
+  }
+
+  // Saves the person currently in the form — as a new entry if they weren't
+  // one yet, or by flushing the edit into their existing entry — then starts
+  // a fresh, blank form for the next person. Employer-level fields are kept
+  // since they don't vary per person.
+  //
+  // The flush here is synchronous (via the functional setEntries form, using
+  // `activeEntryId`/`values` read fresh from this render's closure) rather
+  // than relying on the background sync effect above to have already caught
+  // up — that effect runs asynchronously after paint, so a click landing
+  // before it flushes could otherwise silently drop the latest edit.
+  function handleAddAndFillNext() {
+    setEntries((current) =>
+      activeEntryId === null
+        ? [...current, { id: crypto.randomUUID(), values }]
+        : current.map((entry) =>
+            entry.id === activeEntryId ? { ...entry, values } : entry,
+          ),
+    );
+    setActiveEntryId(null);
+    setValues(computeEmployerAutofill(boxes));
+  }
+
+  // Flushes the form's current values into whichever entry was active
+  // before switching (same reasoning as handleAddAndFillNext above) so
+  // clicking around the list never silently discards unsaved edits.
+  function handleSelectEntry(entryId: string) {
+    if (entryId === activeEntryId) return;
+
+    // Safe to read from the pre-flush `entries` snapshot: the target entry
+    // is (by the guard above) never the one being flushed, so its values
+    // are unaffected by the flush below.
+    const target = entries.find((candidate) => candidate.id === entryId);
+    if (!target) return;
+
+    setEntries((current) =>
+      activeEntryId === null
+        ? current
+        : current.map((entry) =>
+            entry.id === activeEntryId ? { ...entry, values } : entry,
+          ),
+    );
+    setActiveEntryId(entryId);
+    setValues(target.values);
+  }
+
+  function handleDeleteEntry() {
+    if (!deletingEntryId) return;
+    setEntries((current) =>
+      current.filter((entry) => entry.id !== deletingEntryId),
+    );
+    if (activeEntryId === deletingEntryId) {
+      setActiveEntryId(null);
+      setValues(computeEmployerAutofill(boxes));
+    }
+    setDeletingEntryId(null);
+  }
+
+  // Separate from deleting one person at a time — lets the user start a
+  // fresh batch without clicking "delete" on everyone individually.
+  function handleClearAllEntries() {
+    setEntries([]);
+    setActiveEntryId(null);
+    setValues(computeEmployerAutofill(boxes));
+    setConfirmingClearEntries(false);
   }
 
   function updateBoxRect(id: string, pixelRect: PixelRect) {
@@ -195,10 +355,20 @@ export function FieldForm({
   async function handleDownload() {
     setExporting(true);
     try {
-      const bytes = await exportFilledPdf(template.pdfData, boxes, values);
+      // No one added via "Add & fill next person" — fall back to exactly
+      // what's in the form now, so the common single-person case needs no
+      // extra click and produces the same single-page PDF as always.
+      const entriesValues =
+        entries.length > 0 ? entries.map((entry) => entry.values) : [values];
+      const bytes = await exportFilledPdf(
+        template.pdfData,
+        boxes,
+        entriesValues,
+      );
       const filename = `${template.name.replace(/[^a-z0-9]+/gi, "_")}.pdf`;
       downloadPdfBytes(bytes, filename);
-    } catch {
+    } catch (err) {
+      console.error("Export failed:", err);
       setError(
         "Something went wrong creating your PDF. Please try again.",
       );
@@ -209,9 +379,11 @@ export function FieldForm({
 
   return (
     <div className="flex w-full max-w-5xl flex-col gap-4">
-      <div className="flex w-full items-center justify-between">
-        <h2 className="text-xl font-semibold">{template.name}</h2>
-        <div className="flex items-center gap-2">
+      <div className="flex w-full flex-wrap items-center justify-between gap-3">
+        <h2 className="text-2xl font-semibold tracking-tight">
+          {template.name}
+        </h2>
+        <div className="flex flex-wrap items-center gap-2">
           {boxes.length > 0 && (
             <Button onClick={handleDownload} disabled={exporting}>
               {exporting ? "Preparing PDF…" : "Download PDF"}
@@ -247,6 +419,14 @@ export function FieldForm({
           <Button variant="outline" onClick={onEditFields}>
             Edit fields
           </Button>
+          {boxes.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => setConfirmingClear(true)}
+            >
+              Clear values
+            </Button>
+          )}
           <Button variant="outline" onClick={onBack}>
             Back to templates
           </Button>
@@ -254,7 +434,10 @@ export function FieldForm({
       </div>
 
       {boxes.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border p-10 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+            <FileTextIcon className="size-6 text-muted-foreground" />
+          </div>
           <p className="text-muted-foreground">
             This template doesn't have any fields yet.
           </p>
@@ -262,26 +445,27 @@ export function FieldForm({
         </div>
       ) : (
         <div className="flex w-full items-start gap-6">
-          <div
-            className="relative shrink-0 select-none"
-            style={
-              canvasSize
-                ? { width: canvasSize.width, height: canvasSize.height }
-                : undefined
-            }
-          >
-            <canvas
-              ref={pdfCanvasRef}
-              className="rounded-md border border-border shadow-sm"
-            />
-            <canvas
-              ref={textCanvasRef}
-              width={canvasSize?.width}
-              height={canvasSize?.height}
-              className="pointer-events-none absolute inset-0"
-            />
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div
+              className="relative shrink-0 select-none"
+              style={
+                canvasSize
+                  ? { width: canvasSize.width, height: canvasSize.height }
+                  : undefined
+              }
+            >
+              <canvas
+                ref={pdfCanvasRef}
+                className="rounded-lg border border-border"
+              />
+              <canvas
+                ref={textCanvasRef}
+                width={canvasSize?.width}
+                height={canvasSize?.height}
+                className="pointer-events-none absolute inset-0"
+              />
 
-            {canvasSize &&
+              {canvasSize &&
               boxes.map((box) => {
                 const pixelRect = pointToPixelRect(box);
 
@@ -342,13 +526,14 @@ export function FieldForm({
                   </Rnd>
                 );
               })}
+            </div>
           </div>
 
-          <div className="flex w-72 shrink-0 flex-col gap-3">
-            {/* Fields follow the order boxes were drawn in (boxes is
-                already in creation order) — matches the natural
-                top-to-bottom flow of filling in a form. */}
-            {boxes.map((box) => {
+          <div className="flex w-72 shrink-0 flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+            <h3 className="text-sm font-semibold text-foreground">Fields</h3>
+            {/* Fields follow their position on the page — top-to-bottom,
+                then left-to-right — not the order they were drawn in. */}
+            {orderedBoxes.map((box) => {
               const warning = validateFieldValue(
                 box.validationType,
                 values[box.id] ?? "",
@@ -377,6 +562,66 @@ export function FieldForm({
               );
             })}
           </div>
+
+          <div className="flex w-56 shrink-0 flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground">
+                People
+              </h3>
+              {entries.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmingClearEntries(true)}
+                >
+                  Clear all
+                </Button>
+              )}
+            </div>
+            <Button variant="outline" onClick={handleAddAndFillNext}>
+              Add &amp; fill next person
+            </Button>
+
+            {entries.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border p-4 text-center">
+                <UsersIcon className="size-5 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">
+                  Filling in just one person? Download PDF works right away —
+                  this list is only for several people at once.
+                </p>
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {entries.map((entry, index) => (
+                  <li key={entry.id}>
+                    <div
+                      className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 transition-colors ${
+                        entry.id === activeEntryId
+                          ? "border-primary bg-primary/10"
+                          : "border-border"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelectEntry(entry.id)}
+                        className="flex-1 truncate text-left text-sm"
+                      >
+                        Person {index + 1}
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Delete Person ${index + 1}`}
+                        onClick={() => setDeletingEntryId(entry.id)}
+                      >
+                        <Trash2Icon className="text-destructive" />
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       )}
 
@@ -387,6 +632,86 @@ export function FieldForm({
         onChange={updateBoxStyle}
         onClose={() => setEditingBoxId(null)}
       />
+
+      <Dialog
+        open={confirmingClear}
+        onOpenChange={(open) => !open && setConfirmingClear(false)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear all values?</DialogTitle>
+            <DialogDescription>
+              This will erase everything typed into this template's fields.
+              This can't be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmingClear(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleClearValues}>
+              Clear values
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deletingEntryId !== null}
+        onOpenChange={(open) => !open && setDeletingEntryId(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove this person?</DialogTitle>
+            <DialogDescription>
+              This will remove "Person{" "}
+              {entries.findIndex((entry) => entry.id === deletingEntryId) + 1}
+              " from this download. This can't be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeletingEntryId(null)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteEntry}>
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={confirmingClearEntries}
+        onOpenChange={(open) => !open && setConfirmingClearEntries(false)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear all people?</DialogTitle>
+            <DialogDescription>
+              This will remove everyone added to this batch ({entries.length}{" "}
+              {entries.length === 1 ? "person" : "people"}). This can't be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmingClearEntries(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleClearAllEntries}>
+              Clear all
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

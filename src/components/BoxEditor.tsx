@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Rnd } from "react-rnd";
-import { Trash2Icon } from "lucide-react";
+import { LayersIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { BoxStyleDialog } from "@/components/BoxStyleDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { makeUnitConverters, type PixelRect } from "@/lib/boxGeometry";
+import {
+  makeUnitConverters,
+  sortBoxesByPosition,
+  type PixelRect,
+} from "@/lib/boxGeometry";
 import {
   base64ToBytes,
   getPageSize,
@@ -57,6 +61,8 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
   const [pendingName, setPendingName] = useState("");
   const [deletingBox, setDeletingBox] = useState<FieldBox | null>(null);
   const [editingBoxId, setEditingBoxId] = useState<string | null>(null);
+  const [renamingBox, setRenamingBox] = useState<FieldBox | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -197,6 +203,25 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
     setDirty(true);
   }
 
+  function startRenameBox(box: FieldBox) {
+    setRenamingBox(box);
+    setRenameValue(box.name);
+  }
+
+  function confirmRenameBox() {
+    if (!renamingBox) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed) return;
+
+    setBoxes((current) =>
+      current.map((box) =>
+        box.id === renamingBox.id ? { ...box, name: trimmed } : box,
+      ),
+    );
+    setDirty(true);
+    setRenamingBox(null);
+  }
+
   function handleSave() {
     setSaving(true);
     saveTemplateBoxes(template.id, boxes);
@@ -206,15 +231,17 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
 
   return (
     <div className="flex w-full max-w-5xl flex-col gap-4">
-      <div className="flex w-full items-center justify-between">
+      <div className="flex w-full items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold">{template.name}</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            {template.name}
+          </h2>
           <p className="text-sm text-muted-foreground">
             Click and drag on the PDF to add a field. Click an existing field
             to change its font, size, color, or alignment.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-3">
           {dirty && (
             <span className="text-sm text-muted-foreground">
               Unsaved changes
@@ -230,97 +257,121 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
       </div>
 
       <div className="flex w-full items-start gap-6">
-        <div
-          className="relative shrink-0 select-none"
-          style={
-            canvasSize
-              ? { width: canvasSize.width, height: canvasSize.height }
-              : undefined
-          }
-        >
-          <canvas
-            ref={canvasRef}
-            className="rounded-md border border-border shadow-sm"
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerUp}
-          />
-
-          {draftRect && (
-            <div
-              className="pointer-events-none absolute border-2 border-dashed border-primary bg-primary/10"
-              style={{
-                left: draftRect.x,
-                top: draftRect.y,
-                width: draftRect.width,
-                height: draftRect.height,
-              }}
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div
+            className="relative shrink-0 select-none"
+            style={
+              canvasSize
+                ? { width: canvasSize.width, height: canvasSize.height }
+                : undefined
+            }
+          >
+            <canvas
+              ref={canvasRef}
+              className="rounded-lg border border-border"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
             />
-          )}
 
-          {canvasSize &&
-            boxes.map((box) => {
-              const pixelRect = pointToPixelRect(box);
-              return (
-                <Rnd
-                  key={box.id}
-                  bounds="parent"
-                  position={{ x: pixelRect.x, y: pixelRect.y }}
-                  size={{ width: pixelRect.width, height: pixelRect.height }}
-                  onDragStop={(_event, data) =>
-                    updateBoxRect(box.id, {
-                      ...pixelRect,
-                      x: data.x,
-                      y: data.y,
-                    })
-                  }
-                  onResizeStop={(_event, _direction, ref, _delta, position) =>
-                    updateBoxRect(box.id, {
-                      x: position.x,
-                      y: position.y,
-                      width: parseFloat(ref.style.width),
-                      height: parseFloat(ref.style.height),
-                    })
-                  }
-                  resizeHandleStyles={resizeHandleStyles}
-                  className="group border-2 border-primary bg-primary/10 hover:bg-primary/20"
-                >
-                  <div
-                    className="h-full w-full cursor-pointer"
-                    onClick={() => setEditingBoxId(box.id)}
+            {draftRect && (
+              <div
+                className="pointer-events-none absolute border-2 border-dashed border-primary bg-primary/10"
+                style={{
+                  left: draftRect.x,
+                  top: draftRect.y,
+                  width: draftRect.width,
+                  height: draftRect.height,
+                }}
+              />
+            )}
+
+            {canvasSize &&
+              boxes.map((box) => {
+                const pixelRect = pointToPixelRect(box);
+                return (
+                  <Rnd
+                    key={box.id}
+                    bounds="parent"
+                    position={{ x: pixelRect.x, y: pixelRect.y }}
+                    size={{
+                      width: pixelRect.width,
+                      height: pixelRect.height,
+                    }}
+                    onDragStop={(_event, data) =>
+                      updateBoxRect(box.id, {
+                        ...pixelRect,
+                        x: data.x,
+                        y: data.y,
+                      })
+                    }
+                    onResizeStop={(
+                      _event,
+                      _direction,
+                      ref,
+                      _delta,
+                      position,
+                    ) =>
+                      updateBoxRect(box.id, {
+                        x: position.x,
+                        y: position.y,
+                        width: parseFloat(ref.style.width),
+                        height: parseFloat(ref.style.height),
+                      })
+                    }
+                    resizeHandleStyles={resizeHandleStyles}
+                    className="group border-2 border-primary bg-primary/10 hover:bg-primary/20"
                   >
-                    <span className="pointer-events-none absolute -top-6 left-0 rounded bg-primary px-1.5 py-0.5 text-xs whitespace-nowrap text-primary-foreground">
-                      {box.name}
-                    </span>
-                  </div>
-                </Rnd>
-              );
-            })}
+                    <div
+                      className="h-full w-full cursor-pointer"
+                      onClick={() => setEditingBoxId(box.id)}
+                    >
+                      <span className="pointer-events-none absolute -top-6 left-0 rounded bg-primary px-1.5 py-0.5 text-xs whitespace-nowrap text-primary-foreground">
+                        {box.name}
+                      </span>
+                    </div>
+                  </Rnd>
+                );
+              })}
+          </div>
         </div>
 
-        <div className="flex w-64 shrink-0 flex-col gap-2">
-          <h3 className="font-medium">Fields</h3>
+        <div className="flex w-64 shrink-0 flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <h3 className="text-sm font-semibold text-foreground">Fields</h3>
           {boxes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No fields yet — draw a box on the PDF to add one.
-            </p>
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border p-6 text-center">
+              <LayersIcon className="size-5 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                No fields yet — draw a box on the PDF to add one.
+              </p>
+            </div>
           ) : (
-            <ul className="flex flex-col gap-1">
-              {boxes.map((box) => (
+            <ul className="flex flex-col gap-1.5">
+              {sortBoxesByPosition(boxes).map((box) => (
                 <li
                   key={box.id}
-                  className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5"
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border px-2.5 py-1.5"
                 >
                   <span className="truncate text-sm">{box.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Delete field "${box.name}"`}
-                    onClick={() => setDeletingBox(box)}
-                  >
-                    <Trash2Icon className="text-destructive" />
-                  </Button>
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Rename field "${box.name}"`}
+                      onClick={() => startRenameBox(box)}
+                    >
+                      <PencilIcon />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Delete field "${box.name}"`}
+                      onClick={() => setDeletingBox(box)}
+                    >
+                      <Trash2Icon className="text-destructive" />
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -389,6 +440,36 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
         onChange={updateBoxStyle}
         onClose={() => setEditingBoxId(null)}
       />
+
+      <Dialog
+        open={renamingBox !== null}
+        onOpenChange={(open) => !open && setRenamingBox(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename field</DialogTitle>
+            <DialogDescription>
+              Choose a new name for "{renamingBox?.name}".
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(event) => setRenameValue(event.target.value)}
+            autoFocus
+            onKeyDown={(event) => {
+              if (event.key === "Enter") confirmRenameBox();
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenamingBox(null)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmRenameBox} disabled={!renameValue.trim()}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

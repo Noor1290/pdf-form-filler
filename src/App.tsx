@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FileTextIcon } from "lucide-react";
 import { BoxEditor } from "@/components/BoxEditor";
 import { FieldForm } from "@/components/FieldForm";
 import { NewTemplateFlow } from "@/components/NewTemplateFlow";
@@ -42,8 +43,8 @@ function App() {
   }, [view, activeTemplate]);
 
   // BoxEditor/FieldForm save straight to localStorage without telling App,
-  // so the list (and anything reading from it, like Export) would otherwise
-  // show stale data until something else happened to trigger a refresh.
+  // so the list would otherwise show stale data (e.g. an old "last updated"
+  // date) until something else happened to trigger a refresh.
   useEffect(() => {
     if (view.name === "home") {
       refreshTemplates();
@@ -52,60 +53,68 @@ function App() {
   }, [view]);
 
   return (
-    <div className="flex min-h-svh flex-col items-center gap-6 p-8">
-      <h1 className="text-3xl font-semibold tracking-tight">
-        Statement of Emoluments Tool
-      </h1>
+    <div className="flex min-h-svh flex-col bg-background">
+      <header className="border-b border-border bg-card">
+        <div className="mx-auto flex max-w-6xl items-center gap-2.5 px-6 py-4">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <FileTextIcon className="size-4.5" />
+          </div>
+          <h1 className="text-base font-semibold tracking-tight text-foreground">
+            Statement of Emoluments Tool
+          </h1>
+        </div>
+      </header>
 
-      {view.name === "home" && (
-        <TemplateList
-          templates={templates}
-          onNewTemplate={() => setView({ name: "new" })}
-          onOpenSettings={() => setView({ name: "settings" })}
-          onFillTemplate={(id) => setView({ name: "fill", id })}
-          onEditTemplate={(id) => setView({ name: "edit-boxes", id })}
-          onRenameTemplate={(id, name) => {
-            renameTemplate(id, name);
-            refreshTemplates();
-          }}
-          onDeleteTemplate={(id) => {
-            deleteTemplate(id);
-            refreshTemplates();
-          }}
-          onImported={refreshTemplates}
-        />
-      )}
+      <main className="flex flex-1 flex-col items-center gap-6 px-6 py-10">
+        {view.name === "home" && (
+          <TemplateList
+            templates={templates}
+            onNewTemplate={() => setView({ name: "new" })}
+            onOpenSettings={() => setView({ name: "settings" })}
+            onFillTemplate={(id) => setView({ name: "fill", id })}
+            onEditTemplate={(id) => setView({ name: "edit-boxes", id })}
+            onRenameTemplate={(id, name) => {
+              renameTemplate(id, name);
+              refreshTemplates();
+            }}
+            onDeleteTemplate={(id) => {
+              deleteTemplate(id);
+              refreshTemplates();
+            }}
+          />
+        )}
 
-      {view.name === "settings" && (
-        <SettingsPanel onBack={() => setView({ name: "home" })} />
-      )}
+        {view.name === "settings" && (
+          <SettingsPanel onBack={() => setView({ name: "home" })} />
+        )}
 
-      {view.name === "new" && (
-        <NewTemplateFlow
-          onCreated={(template) => {
-            refreshTemplates();
-            setView({ name: "edit-boxes", id: template.id });
-          }}
-          onCancel={() => setView({ name: "home" })}
-        />
-      )}
+        {view.name === "new" && (
+          <NewTemplateFlow
+            onCreated={(template) => {
+              refreshTemplates();
+              setView({ name: "edit-boxes", id: template.id });
+            }}
+            onCancel={() => setView({ name: "home" })}
+          />
+        )}
 
-      {view.name === "edit-boxes" && activeTemplate && (
-        <BoxEditor
-          template={activeTemplate}
-          onBack={() => setView({ name: "home" })}
-        />
-      )}
+        {view.name === "edit-boxes" && activeTemplate && (
+          <BoxEditor
+            template={activeTemplate}
+            onBack={() => setView({ name: "home" })}
+          />
+        )}
 
-      {view.name === "fill" && activeTemplate && (
-        <FieldForm
-          template={activeTemplate}
-          onBack={() => setView({ name: "home" })}
-          onEditFields={() =>
-            setView({ name: "edit-boxes", id: activeTemplate.id })
-          }
-        />
-      )}
+        {view.name === "fill" && activeTemplate && (
+          <FieldForm
+            template={activeTemplate}
+            onBack={() => setView({ name: "home" })}
+            onEditFields={() =>
+              setView({ name: "edit-boxes", id: activeTemplate.id })
+            }
+          />
+        )}
+      </main>
     </div>
   );
 }

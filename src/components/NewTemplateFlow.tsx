@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PdfCanvas } from "@/components/PdfCanvas";
@@ -63,17 +64,28 @@ export function NewTemplateFlow({
   }
 
   return (
-    <div className="flex w-full max-w-2xl flex-col items-center gap-4">
-      <div className="flex w-full items-center justify-between">
-        <h2 className="text-xl font-semibold">New template</h2>
+    <div className="flex w-full max-w-2xl flex-col items-center gap-6">
+      <div className="flex w-full items-center justify-between gap-4">
+        <h2 className="text-2xl font-semibold tracking-tight">
+          New template
+        </h2>
         <Button variant="outline" onClick={onCancel}>
           Back to templates
         </Button>
       </div>
 
       {!file ? (
-        <div className="flex flex-col items-center gap-2">
-          <Button onClick={() => fileInputRef.current?.click()}>
+        <div className="flex w-full flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+            <UploadIcon className="size-6 text-muted-foreground" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="font-medium text-foreground">Upload a blank PDF</p>
+            <p className="text-sm text-muted-foreground">
+              You'll draw fields on it in the next step.
+            </p>
+          </div>
+          <Button className="mt-1" onClick={() => fileInputRef.current?.click()}>
             Upload a PDF
           </Button>
           <input
@@ -85,7 +97,7 @@ export function NewTemplateFlow({
           />
         </div>
       ) : (
-        <div className="flex w-full flex-col items-center gap-4">
+        <div className="flex w-full flex-col items-center gap-4 rounded-xl border border-border bg-card p-6 shadow-sm">
           <div className="flex w-full max-w-sm flex-col gap-1">
             <label htmlFor="template-name" className="text-sm font-medium">
               Template name

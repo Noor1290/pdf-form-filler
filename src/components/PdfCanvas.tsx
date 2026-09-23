@@ -33,7 +33,7 @@ export function PdfCanvas({ source, onError }: PdfCanvasProps) {
   return (
     <canvas
       ref={canvasRef}
-      className="max-w-full rounded-md border border-border shadow-sm"
+      className="max-w-full rounded-lg border border-border shadow-sm"
     />
   );
 }

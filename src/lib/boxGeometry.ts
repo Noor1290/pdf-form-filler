@@ -35,3 +35,16 @@ export function makeUnitConverters(
 
   return { pointsPerPixel, pixelToPointRect, pointToPixelRect, pointsToPixels };
 }
+
+// Orders boxes the way a person reading the page would encounter them —
+// top-to-bottom, then left-to-right for boxes on the same row — rather than
+// the order they happened to be drawn in. Returns a new array; callers that
+// need to keep the underlying (creation-order) array untouched, such as
+// when saving, should keep using the original.
+export function sortBoxesByPosition<
+  T extends { page: number; x: number; y: number },
+>(boxes: T[]): T[] {
+  return [...boxes].sort(
+    (a, b) => a.page - b.page || a.y - b.y || a.x - b.x,
+  );
+}

@@ -111,34 +111,18 @@ function hexToRgbColor(hex: string) {
   return rgb(r, g, b);
 }
 
-// Bakes the current field values into the original PDF, matching each
-// box's position/font/alignment — used by the "Download PDF" action.
-export async function exportFilledPdf(
-  pdfData: string,
+// Draws one entry's values onto a single (already-copied) page, matching
+// each box's position/font/alignment — shared by every page produced by
+// exportFilledPdf below.
+async function drawValuesOnPage(
+  page: PDFPage,
   boxes: FieldBox[],
   values: Record<string, string>,
-): Promise<Uint8Array> {
-  const pdfDoc = await PDFDocument.load(base64ToBytes(pdfData));
-  const fontCache = new Map<string, PDFFont>();
-
-  async function getFont(box: FieldBox): Promise<PDFFont> {
-    const variant = box.bold ? "bold" : "regular";
-    const key = `${box.fontFamily}-${variant}`;
-    const cached = fontCache.get(key);
-    if (cached) return cached;
-    const font = await pdfDoc.embedFont(STANDARD_FONTS[box.fontFamily][variant]);
-    fontCache.set(key, font);
-    return font;
-  }
-
-  const pages = pdfDoc.getPages();
-
+  getFont: (box: FieldBox) => Promise<PDFFont>,
+): Promise<void> {
   for (const box of boxes) {
     const value = values[box.id];
     if (!value) continue;
-
-    const page = pages[box.page - 1];
-    if (!page) continue;
 
     const font = await getFont(box);
     const textWidth = font.widthOfTextAtSize(value, box.fontSize);
@@ -171,8 +155,66 @@ export async function exportFilledPdf(
       rotate: degrees(page.getRotation().angle),
     });
   }
+}
 
-  return pdfDoc.save();
+// Bakes one filled set of values per entry into the original PDF, matching
+// each box's position/font/alignment — used by the "Download PDF" action.
+// Each entry becomes its own copy of the source PDF's page(s), appended in
+// order, so filling in several people produces one multi-page PDF rather
+// than one download per person. A single entry behaves exactly like the
+// original single-person export (same page count, nothing extra).
+export async function exportFilledPdf(
+  pdfData: string,
+  boxes: FieldBox[],
+  entriesValues: Record<string, string>[],
+): Promise<Uint8Array> {
+  // Some source PDFs carry owner-level restrictions (no open password, but
+  // pdf-lib refuses to load them by default) — safe to ignore here since we
+  // only read pages and draw text, never touch the restrictions themselves.
+  const sourceDoc = await PDFDocument.load(base64ToBytes(pdfData), {
+    ignoreEncryption: true,
+  });
+  const outputDoc = await PDFDocument.create();
+  const fontCache = new Map<string, PDFFont>();
+
+  async function getFont(box: FieldBox): Promise<PDFFont> {
+    const variant = box.bold ? "bold" : "regular";
+    const key = `${box.fontFamily}-${variant}`;
+    const cached = fontCache.get(key);
+    if (cached) return cached;
+    // Fonts are embedded into whichever document draws with them — that's
+    // the shared output doc here, not the source, so one embed covers every
+    // entry's pages.
+    const font = await outputDoc.embedFont(
+      STANDARD_FONTS[box.fontFamily][variant],
+    );
+    fontCache.set(key, font);
+    return font;
+  }
+
+  const sourcePageIndices = sourceDoc.getPageIndices();
+  const boxesByPage = new Map<number, FieldBox[]>();
+  for (const box of boxes) {
+    const existing = boxesByPage.get(box.page);
+    if (existing) existing.push(box);
+    else boxesByPage.set(box.page, [box]);
+  }
+
+  for (const entryValues of entriesValues) {
+    const copiedPages = await outputDoc.copyPages(
+      sourceDoc,
+      sourcePageIndices,
+    );
+
+    for (const [pageIndex, page] of copiedPages.entries()) {
+      outputDoc.addPage(page);
+      const pageBoxes = boxesByPage.get(pageIndex + 1);
+      if (!pageBoxes) continue;
+      await drawValuesOnPage(page, pageBoxes, entryValues, getFont);
+    }
+  }
+
+  return outputDoc.save();
 }
 
 // Converts a point from the page's VISUAL coordinate space (top-left

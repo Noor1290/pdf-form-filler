@@ -1,5 +1,4 @@
-import { templateSchema } from "@/lib/validation";
-import type { FieldBox, Template } from "@/types/template";
+import type { FieldBox, Template, TemplateEntry } from "@/types/template";
 
 const STORAGE_KEY = "pdf-editor:templates";
 
@@ -72,28 +71,27 @@ export function saveTemplateBoxes(
   return saved;
 }
 
-// The exported file is the whole Template, PDF bytes included, so it's a
-// complete, self-contained backup — matching the "no backend in v1" design.
-export function exportTemplateAsJson(template: Template): void {
-  const json = JSON.stringify(template, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${template.name.replace(/[^a-z0-9]+/gi, "_")}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
+// Doesn't bump updatedAt — this fires on every debounced keystroke while
+// filling in a form, and reordering the template list mid-typing would be
+// disruptive. updatedAt stays reserved for structural changes (boxes/name).
+export function saveTemplateValues(
+  id: string,
+  values: Record<string, string>,
+): void {
+  const templates = readAll().map((template) =>
+    template.id === id ? { ...template, values } : template,
+  );
+  writeAll(templates);
 }
 
-// Throws if the file isn't a valid template (untrusted input from disk) —
-// callers should catch and show a plain-language error.
-export function importTemplateFromJson(json: string): Template {
-  const parsed = templateSchema.parse(JSON.parse(json));
-  const now = new Date().toISOString();
-  // Always assign a fresh id so importing into a browser that already has
-  // templates (e.g. sharing between the accountant and his daughter) never
-  // silently collides with or overwrites an existing one.
-  const imported: Template = { ...parsed, id: crypto.randomUUID(), updatedAt: now };
-  writeAll([...readAll(), imported]);
-  return imported;
+// Doesn't bump updatedAt, same reasoning as saveTemplateValues above — this
+// fires on every debounced change while filling in a batch of people.
+export function saveTemplateEntries(
+  id: string,
+  entries: TemplateEntry[],
+): void {
+  const templates = readAll().map((template) =>
+    template.id === id ? { ...template, entries } : template,
+  );
+  writeAll(templates);
 }

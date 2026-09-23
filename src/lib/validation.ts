@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { FieldBox, Template } from "@/types/template";
+import type { FieldBox } from "@/types/template";
 
 // Keywords chosen straight from the roadmap's own example ("contains
 // 'amount' -> numeric"); kept short and generic on purpose — see CLAUDE.md
@@ -37,31 +37,3 @@ export function validateFieldValue(
   const result = amountSchema.safeParse(trimmed);
   return result.success ? null : result.error.issues[0].message;
 }
-
-// Validates a Template imported from a .json file (see roadmap Step 10) —
-// this is untrusted input from disk, unlike the app's own localStorage.
-const fieldBoxSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  page: z.number(),
-  x: z.number(),
-  y: z.number(),
-  width: z.number(),
-  height: z.number(),
-  fontSize: z.number(),
-  fontFamily: z.enum(["Helvetica", "Times-Roman", "Courier"]),
-  bold: z.boolean(),
-  align: z.enum(["left", "center", "right"]),
-  color: z.string(),
-  validationType: z.enum(["text", "amount"]).optional(),
-}) satisfies z.ZodType<FieldBox>;
-
-export const templateSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  pdfFileName: z.string(),
-  pdfData: z.string(),
-  boxes: z.array(fieldBoxSchema),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-}) satisfies z.ZodType<Template>;

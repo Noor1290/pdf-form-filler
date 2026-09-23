@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
+import { FileStackIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { exportTemplateAsJson, importTemplateFromJson } from "@/lib/template";
 import type { Template } from "@/types/template";
 
 type TemplateListProps = {
@@ -20,7 +20,6 @@ type TemplateListProps = {
   onEditTemplate: (id: string) => void;
   onRenameTemplate: (id: string, name: string) => void;
   onDeleteTemplate: (id: string) => void;
-  onImported: () => void;
 };
 
 export function TemplateList({
@@ -31,13 +30,10 @@ export function TemplateList({
   onEditTemplate,
   onRenameTemplate,
   onDeleteTemplate,
-  onImported,
 }: TemplateListProps) {
   const [renaming, setRenaming] = useState<Template | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleting, setDeleting] = useState<Template | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
-  const importInputRef = useRef<HTMLInputElement>(null);
 
   function startRename(template: Template) {
     setRenaming(template);
@@ -57,73 +53,60 @@ export function TemplateList({
     setDeleting(null);
   }
 
-  async function handleImportFile(
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      importTemplateFromJson(text);
-      setImportError(null);
-      onImported();
-    } catch {
-      setImportError(
-        "This file doesn't look like a template — try exporting one from the templates list to see the right format.",
-      );
-    }
-  }
-
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Your templates</h2>
-        <div className="flex gap-2">
+    <div className="flex w-full max-w-2xl flex-col gap-6">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Your templates
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Pick a template to fill in, or create a new one.
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2">
           <Button variant="outline" onClick={onOpenSettings}>
             Employer details
           </Button>
-          <Button variant="outline" onClick={() => importInputRef.current?.click()}>
-            Import template
-          </Button>
-          <input
-            ref={importInputRef}
-            type="file"
-            accept="application/json"
-            className="hidden"
-            onChange={handleImportFile}
-          />
           {templates.length > 0 && (
             <Button onClick={onNewTemplate}>New Template</Button>
           )}
         </div>
       </div>
 
-      {importError && (
-        <p className="text-sm text-destructive">{importError}</p>
-      )}
-
       {templates.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border p-10 text-center">
-          <p className="text-muted-foreground">
-            No templates yet — upload a PDF to create your first one.
-          </p>
-          <Button onClick={onNewTemplate}>Upload a PDF</Button>
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+            <FileStackIcon className="size-6 text-muted-foreground" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="font-medium text-foreground">No templates yet</p>
+            <p className="text-sm text-muted-foreground">
+              Upload a PDF to create your first one.
+            </p>
+          </div>
+          <Button className="mt-1" onClick={onNewTemplate}>
+            Upload a PDF
+          </Button>
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-3">
           {templates.map((template) => (
             <li
               key={template.id}
-              className="flex items-center justify-between gap-3 rounded-md border border-border p-3"
+              className="flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 shadow-sm transition-colors hover:border-primary/40"
             >
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
+                <FileStackIcon className="size-5" />
+              </div>
               <button
                 type="button"
                 onClick={() => onFillTemplate(template.id)}
                 className="flex flex-1 flex-col items-start text-left"
               >
-                <span className="font-medium">{template.name}</span>
+                <span className="font-medium text-foreground">
+                  {template.name}
+                </span>
                 <span className="text-sm text-muted-foreground">
                   Last updated{" "}
                   {new Date(template.updatedAt).toLocaleDateString()}
@@ -140,23 +123,16 @@ export function TemplateList({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => exportTemplateAsJson(template)}
-                >
-                  Export
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
                   onClick={() => startRename(template)}
                 >
-                  Rename
+                  <PencilIcon /> Rename
                 </Button>
                 <Button
                   variant="destructive"
                   size="sm"
                   onClick={() => setDeleting(template)}
                 >
-                  Delete
+                  <Trash2Icon /> Delete
                 </Button>
               </div>
             </li>
