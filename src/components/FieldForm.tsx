@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Rnd } from "react-rnd";
 import { BoxStyleDialog } from "@/components/BoxStyleDialog";
+import { ImportEntriesDialog } from "@/components/ImportEntriesDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -306,6 +307,30 @@ export function FieldForm({
     setDeletingEntryId(null);
   }
 
+  // Imported people become regular batch entries, same shape as one added
+  // through "Add & fill next person" — kept as its own path (see
+  // ImportEntriesDialog) rather than merged into that flow. Selecting the
+  // last imported person afterward, the same way handleAddAndFillNext
+  // leaves its new person selected, keeps the form's `values` matching a
+  // real entry — otherwise handleDownload's "new not-yet-added person"
+  // logic (see its comment) would mistake leftover form state for an extra,
+  // blank trailing person in the export.
+  function handleImportEntries(
+    importedValues: Record<string, string>[],
+    mode: "append" | "replace",
+  ) {
+    const imported: TemplateEntry[] = importedValues.map((entryValues) => ({
+      id: crypto.randomUUID(),
+      values: entryValues,
+    }));
+    setEntries((current) =>
+      mode === "replace" ? imported : [...current, ...imported],
+    );
+    const lastImported = imported[imported.length - 1];
+    setActiveEntryId(lastImported.id);
+    setValues(lastImported.values);
+  }
+
   // Separate from deleting one person at a time — lets the user start a
   // fresh batch without clicking "delete" on everyone individually.
   function handleClearAllEntries() {
@@ -357,9 +382,23 @@ export function FieldForm({
     try {
       // No one added via "Add & fill next person" — fall back to exactly
       // what's in the form now, so the common single-person case needs no
-      // extra click and produces the same single-page PDF as always.
+      // extra click and produces the same single-page PDF as always. When
+      // people HAVE been added, flush the form's current values into
+      // whichever slot it represents — the active entry if editing one, or
+      // a new trailing person otherwise — rather than trusting the
+      // background sync effect to have already caught up (same reasoning
+      // as the explicit flushes in handleAddAndFillNext/handleSelectEntry):
+      // without this, the last person typed in without clicking "Add &
+      // fill next person" again was silently left out of the download.
       const entriesValues =
-        entries.length > 0 ? entries.map((entry) => entry.values) : [values];
+        entries.length === 0
+          ? [values]
+          : [
+              ...entries.map((entry) =>
+                entry.id === activeEntryId ? values : entry.values,
+              ),
+              ...(activeEntryId === null ? [values] : []),
+            ];
       const bytes = await exportFilledPdf(
         template.pdfData,
         boxes,
@@ -581,6 +620,11 @@ export function FieldForm({
             <Button variant="outline" onClick={handleAddAndFillNext}>
               Add &amp; fill next person
             </Button>
+            <ImportEntriesDialog
+              boxes={boxes}
+              existingEntryCount={entries.length}
+              onImport={handleImportEntries}
+            />
 
             {entries.length === 0 ? (
               <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border p-4 text-center">
