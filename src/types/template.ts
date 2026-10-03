@@ -32,6 +32,13 @@ export type Template = {
   // Older saved templates predate this field, so treat a missing value the
   // same as "no one added yet" (empty array) everywhere it's read.
   entries?: TemplateEntry[];
+  // Company/employer details (name, address, TAN, ...) used to autofill
+  // this template's matching fields — specific to this template, not shared
+  // across every template. `undefined` means this template hasn't gone
+  // through the one-time "copy from your existing details, or start blank"
+  // choice yet (see CompanyDetailsPanel), not "no fields" — an empty array
+  // is a deliberate "no fields" state after that choice is made.
+  employerFields?: EmployerField[];
   createdAt: string;
   updatedAt: string;
 };

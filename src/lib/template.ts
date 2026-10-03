@@ -1,4 +1,9 @@
-import type { FieldBox, Template, TemplateEntry } from "@/types/template";
+import type {
+  EmployerField,
+  FieldBox,
+  Template,
+  TemplateEntry,
+} from "@/types/template";
 
 const STORAGE_KEY = "pdf-editor:templates";
 
@@ -92,6 +97,18 @@ export function saveTemplateEntries(
 ): void {
   const templates = readAll().map((template) =>
     template.id === id ? { ...template, entries } : template,
+  );
+  writeAll(templates);
+}
+
+export function saveTemplateEmployerFields(
+  id: string,
+  employerFields: EmployerField[],
+): void {
+  const templates = readAll().map((template) =>
+    template.id === id
+      ? { ...template, employerFields, updatedAt: new Date().toISOString() }
+      : template,
   );
   writeAll(templates);
 }

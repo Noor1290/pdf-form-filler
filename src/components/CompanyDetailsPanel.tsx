@@ -10,44 +10,68 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { getEmployerFields, saveEmployerFields } from "@/lib/employerProfile";
-import type { EmployerField } from "@/types/template";
+import { DEFAULT_FIELDS, getLegacyEmployerFields } from "@/lib/employerProfile";
+import { saveTemplateEmployerFields } from "@/lib/template";
+import type { EmployerField, Template } from "@/types/template";
 
-type SettingsPanelProps = {
+type CompanyDetailsPanelProps = {
+  template: Template;
   onBack: () => void;
 };
 
-export function SettingsPanel({ onBack }: SettingsPanelProps) {
-  const [fields, setFields] = useState<EmployerField[]>(() =>
-    getEmployerFields(),
+// Each template has its own company details now, not one set shared by
+// every template — the first time a template is opened here (its
+// `employerFields` is still unset), offer to copy whatever was saved before
+// this change as a starting point, rather than silently picking for the
+// user. A template that already has its own fields (even an empty list, a
+// deliberate "no fields" choice) skips straight to the editor.
+export function CompanyDetailsPanel({
+  template,
+  onBack,
+}: CompanyDetailsPanelProps) {
+  const [fields, setFields] = useState<EmployerField[] | null>(
+    () => template.employerFields ?? null,
   );
   const [saved, setSaved] = useState(false);
   const [deletingField, setDeletingField] = useState<EmployerField | null>(
     null,
   );
-  // So Save can avoid accidentally blanking out a label the user already
-  // had — only a genuinely brand-new field is allowed to save with no name.
   const originalLabelsById = useRef(
-    new Map(fields.map((field) => [field.id, field.label])),
+    new Map((template.employerFields ?? []).map((field) => [field.id, field.label])),
   );
+
+  const legacyFields = getLegacyEmployerFields();
+  const hasLegacyData = legacyFields.some((field) => field.value.trim());
+
+  function startFromLegacy() {
+    setFields(legacyFields);
+  }
+
+  function startBlank() {
+    setFields(DEFAULT_FIELDS);
+  }
 
   function updateLabel(id: string, label: string) {
     setFields((current) =>
-      current.map((field) => (field.id === id ? { ...field, label } : field)),
+      (current ?? []).map((field) =>
+        field.id === id ? { ...field, label } : field,
+      ),
     );
     setSaved(false);
   }
 
   function updateValue(id: string, value: string) {
     setFields((current) =>
-      current.map((field) => (field.id === id ? { ...field, value } : field)),
+      (current ?? []).map((field) =>
+        field.id === id ? { ...field, value } : field,
+      ),
     );
     setSaved(false);
   }
 
   function handleAddField() {
     setFields((current) => [
-      ...current,
+      ...(current ?? []),
       { id: crypto.randomUUID(), label: "", value: "" },
     ]);
     setSaved(false);
@@ -56,19 +80,19 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
   function confirmDeleteField() {
     if (!deletingField) return;
     setFields((current) =>
-      current.filter((field) => field.id !== deletingField.id),
+      (current ?? []).filter((field) => field.id !== deletingField.id),
     );
     setDeletingField(null);
     setSaved(false);
   }
 
   function handleSave() {
-    const cleaned = fields.map((field) => {
+    const cleaned = (fields ?? []).map((field) => {
       if (field.label.trim()) return field;
       const original = originalLabelsById.current.get(field.id);
       return original ? { ...field, label: original } : field;
     });
-    saveEmployerFields(cleaned);
+    saveTemplateEmployerFields(template.id, cleaned);
     setFields(cleaned);
     originalLabelsById.current = new Map(
       cleaned.map((field) => [field.id, field.label]),
@@ -76,15 +100,50 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setSaved(true);
   }
 
+  if (fields === null) {
+    return (
+      <div className="flex w-full max-w-md flex-col gap-6">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Company details for "{template.name}"
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {hasLegacyData
+              ? "You have company details saved from before. Start this template from those, or start blank?"
+              : "Fill in company details for this template — filled in automatically wherever a field matches."}
+          </p>
+        </div>
+
+        {hasLegacyData ? (
+          <div className="flex flex-col gap-2">
+            <Button onClick={startFromLegacy}>
+              Copy my existing company details
+            </Button>
+            <Button variant="outline" onClick={startBlank}>
+              Start blank
+            </Button>
+          </div>
+        ) : (
+          <Button onClick={startBlank}>Get started</Button>
+        )}
+
+        <Button variant="outline" onClick={onBack}>
+          Back to templates
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-full max-w-md flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">
-            Employer details
+            Company details
           </h2>
           <p className="text-sm text-muted-foreground">
-            Filled in automatically wherever a field matches.
+            For "{template.name}" — filled in automatically wherever a field
+            matches.
           </p>
         </div>
         <Button variant="outline" onClick={onBack}>

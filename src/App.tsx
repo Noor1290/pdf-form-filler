@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { FileTextIcon } from "lucide-react";
 import { BoxEditor } from "@/components/BoxEditor";
+import { CompanyDetailsPanel } from "@/components/CompanyDetailsPanel";
 import { FieldForm } from "@/components/FieldForm";
 import { NewTemplateFlow } from "@/components/NewTemplateFlow";
-import { SettingsPanel } from "@/components/SettingsPanel";
 import { TemplateList } from "@/components/TemplateList";
 import {
   deleteTemplate,
@@ -16,7 +16,7 @@ import type { Template } from "@/types/template";
 type View =
   | { name: "home" }
   | { name: "new" }
-  | { name: "settings" }
+  | { name: "company-details"; id: string }
   | { name: "edit-boxes"; id: string }
   | { name: "fill"; id: string };
 
@@ -31,12 +31,17 @@ function App() {
   }
 
   const activeTemplate =
-    view.name === "edit-boxes" || view.name === "fill"
+    view.name === "edit-boxes" ||
+    view.name === "fill" ||
+    view.name === "company-details"
       ? getTemplate(view.id)
       : undefined;
 
   useEffect(() => {
-    const needsTemplate = view.name === "edit-boxes" || view.name === "fill";
+    const needsTemplate =
+      view.name === "edit-boxes" ||
+      view.name === "fill" ||
+      view.name === "company-details";
     if (needsTemplate && !activeTemplate) {
       setView({ name: "home" });
     }
@@ -70,9 +75,9 @@ function App() {
           <TemplateList
             templates={templates}
             onNewTemplate={() => setView({ name: "new" })}
-            onOpenSettings={() => setView({ name: "settings" })}
             onFillTemplate={(id) => setView({ name: "fill", id })}
             onEditTemplate={(id) => setView({ name: "edit-boxes", id })}
+            onCompanyDetails={(id) => setView({ name: "company-details", id })}
             onRenameTemplate={(id, name) => {
               renameTemplate(id, name);
               refreshTemplates();
@@ -84,8 +89,11 @@ function App() {
           />
         )}
 
-        {view.name === "settings" && (
-          <SettingsPanel onBack={() => setView({ name: "home" })} />
+        {view.name === "company-details" && activeTemplate && (
+          <CompanyDetailsPanel
+            template={activeTemplate}
+            onBack={() => setView({ name: "home" })}
+          />
         )}
 
         {view.name === "new" && (

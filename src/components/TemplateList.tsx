@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileStackIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { Building2Icon, FileStackIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,9 +15,9 @@ import type { Template } from "@/types/template";
 type TemplateListProps = {
   templates: Template[];
   onNewTemplate: () => void;
-  onOpenSettings: () => void;
   onFillTemplate: (id: string) => void;
   onEditTemplate: (id: string) => void;
+  onCompanyDetails: (id: string) => void;
   onRenameTemplate: (id: string, name: string) => void;
   onDeleteTemplate: (id: string) => void;
 };
@@ -25,9 +25,9 @@ type TemplateListProps = {
 export function TemplateList({
   templates,
   onNewTemplate,
-  onOpenSettings,
   onFillTemplate,
   onEditTemplate,
+  onCompanyDetails,
   onRenameTemplate,
   onDeleteTemplate,
 }: TemplateListProps) {
@@ -65,9 +65,6 @@ export function TemplateList({
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <Button variant="outline" onClick={onOpenSettings}>
-            Employer details
-          </Button>
           {templates.length > 0 && (
             <Button onClick={onNewTemplate}>New Template</Button>
           )}
@@ -119,6 +116,13 @@ export function TemplateList({
                   onClick={() => onEditTemplate(template.id)}
                 >
                   Edit fields
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onCompanyDetails(template.id)}
+                >
+                  <Building2Icon /> Company details
                 </Button>
                 <Button
                   variant="outline"

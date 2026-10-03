@@ -24,7 +24,7 @@ import {
   sortBoxesByPosition,
   type PixelRect,
 } from "@/lib/boxGeometry";
-import { getEmployerFields, matchEmployerField } from "@/lib/employerProfile";
+import { matchEmployerField } from "@/lib/employerProfile";
 import {
   base64ToBytes,
   downloadPdfBytes,
@@ -40,7 +40,12 @@ import {
   saveTemplateValues,
 } from "@/lib/template";
 import { validateFieldValue } from "@/lib/validation";
-import type { FieldBox, Template, TemplateEntry } from "@/types/template";
+import type {
+  EmployerField,
+  FieldBox,
+  Template,
+  TemplateEntry,
+} from "@/types/template";
 
 type FieldFormProps = {
   template: Template;
@@ -64,11 +69,15 @@ const CSS_FONT_FAMILY: Record<FieldBox["fontFamily"], string> = {
 
 // Employer-level fields (company name, TAN, ...) don't vary per person, so
 // this is reused both for the first person and every "next person" reset.
-function computeEmployerAutofill(boxes: FieldBox[]): Record<string, string> {
-  const fields = getEmployerFields();
+// `employerFields` comes from this specific template (see
+// CompanyDetailsPanel) — not shared with any other template.
+function computeEmployerAutofill(
+  boxes: FieldBox[],
+  employerFields: EmployerField[],
+): Record<string, string> {
   const result: Record<string, string> = {};
   for (const box of boxes) {
-    const match = matchEmployerField(box.name, fields);
+    const match = matchEmployerField(box.name, employerFields);
     if (match && match.value) {
       result[box.id] = match.value;
     }
@@ -96,7 +105,7 @@ export function FieldForm({
   // template (see roadmap Step 7) win — a saved value always wins, so
   // autofill never overwrites something the user actually typed.
   const [values, setValues] = useState<Record<string, string>>(() => ({
-    ...computeEmployerAutofill(template.boxes),
+    ...computeEmployerAutofill(template.boxes, template.employerFields ?? []),
     ...(template.values ?? {}),
   }));
 
@@ -269,7 +278,7 @@ export function FieldForm({
           ),
     );
     setActiveEntryId(null);
-    setValues(computeEmployerAutofill(boxes));
+    setValues(computeEmployerAutofill(boxes, template.employerFields ?? []));
   }
 
   // Flushes the form's current values into whichever entry was active
@@ -302,7 +311,7 @@ export function FieldForm({
     );
     if (activeEntryId === deletingEntryId) {
       setActiveEntryId(null);
-      setValues(computeEmployerAutofill(boxes));
+      setValues(computeEmployerAutofill(boxes, template.employerFields ?? []));
     }
     setDeletingEntryId(null);
   }
@@ -336,7 +345,7 @@ export function FieldForm({
   function handleClearAllEntries() {
     setEntries([]);
     setActiveEntryId(null);
-    setValues(computeEmployerAutofill(boxes));
+    setValues(computeEmployerAutofill(boxes, template.employerFields ?? []));
     setConfirmingClearEntries(false);
   }
 

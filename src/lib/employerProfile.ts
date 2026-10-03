@@ -6,7 +6,7 @@ const FIELDS_STORAGE_KEY = "pdf-editor:employer-fields";
 const LEGACY_PROFILE_KEY = "pdf-editor:employer-profile";
 const LEGACY_LABELS_KEY = "pdf-editor:employer-field-labels";
 
-const DEFAULT_FIELDS: EmployerField[] = [
+export const DEFAULT_FIELDS: EmployerField[] = [
   { id: "companyName", label: "Company Name", value: "" },
   { id: "address", label: "Address", value: "" },
   { id: "tan", label: "TAN", value: "" },
@@ -30,7 +30,12 @@ function migrateLegacyFields(): EmployerField[] | null {
   }
 }
 
-export function getEmployerFields(): EmployerField[] {
+// Reads the one set of company details saved before company details became
+// per-template (see Template.employerFields). Nothing writes here anymore —
+// this is only offered as a one-time "copy from your existing details"
+// starting point the first time someone opens a template's own company
+// details (see CompanyDetailsPanel), never read for autofill directly.
+export function getLegacyEmployerFields(): EmployerField[] {
   const raw = localStorage.getItem(FIELDS_STORAGE_KEY);
   if (raw) {
     try {
@@ -41,13 +46,6 @@ export function getEmployerFields(): EmployerField[] {
   }
 
   return migrateLegacyFields() ?? DEFAULT_FIELDS;
-}
-
-export function saveEmployerFields(fields: EmployerField[]): void {
-  localStorage.setItem(FIELDS_STORAGE_KEY, JSON.stringify(fields));
-  // Once saved in the new format there's nothing left to migrate from.
-  localStorage.removeItem(LEGACY_PROFILE_KEY);
-  localStorage.removeItem(LEGACY_LABELS_KEY);
 }
 
 // Common ways an accountant might name a box for one of the three fields
