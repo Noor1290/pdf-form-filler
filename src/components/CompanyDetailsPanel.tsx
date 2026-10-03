@@ -44,11 +44,17 @@ export function CompanyDetailsPanel({
   const hasLegacyData = legacyFields.some((field) => field.value.trim());
 
   function startFromLegacy() {
-    setFields(legacyFields);
+    // A deep copy taken right now, not a live link to the legacy snapshot
+    // (or to any other template that also copied from it) — later edits
+    // here must never ripple anywhere else.
+    setFields(structuredClone(legacyFields));
   }
 
   function startBlank() {
-    setFields(DEFAULT_FIELDS);
+    // Never the shared DEFAULT_FIELDS array itself — every template that
+    // starts blank needs its own independent copy, not one every template
+    // would otherwise point at together.
+    setFields(structuredClone(DEFAULT_FIELDS));
   }
 
   function updateLabel(id: string, label: string) {

@@ -41,11 +41,15 @@ export function getLegacyEmployerFields(): EmployerField[] {
     try {
       return JSON.parse(raw);
     } catch {
-      return DEFAULT_FIELDS;
+      return structuredClone(DEFAULT_FIELDS);
     }
   }
 
-  return migrateLegacyFields() ?? DEFAULT_FIELDS;
+  // Always a fresh copy, never the live DEFAULT_FIELDS array itself — this
+  // can be called once per template (see CompanyDetailsPanel's one-time
+  // "copy from your existing details" choice), and each caller needs its
+  // own independent object graph, not a shared one every caller mutates.
+  return migrateLegacyFields() ?? structuredClone(DEFAULT_FIELDS);
 }
 
 // Common ways an accountant might name a box for one of the three fields
