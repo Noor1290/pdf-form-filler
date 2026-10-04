@@ -33,6 +33,7 @@ import {
   loadPdfDocument,
   renderPdfPageToCanvas,
 } from "@/lib/pdf";
+import type { DashboardPayroll } from "@/lib/payrollHub";
 import { resizeHandleStyles } from "@/lib/rndHandleStyles";
 import {
   saveTemplateBoxes,
@@ -51,6 +52,12 @@ type FieldFormProps = {
   template: Template;
   onBack: () => void;
   onEditFields: () => void;
+  // Payroll results waiting from the Payroll Hub dashboard, if any (always
+  // null when the app is opened on its own) — handed straight to the same
+  // import preview a file goes through.
+  dashboardData: DashboardPayroll | null;
+  onDashboardImported: () => void;
+  onDashboardPreviewClosed: () => void;
 };
 
 const PAGE_WIDTH = 800;
@@ -89,6 +96,9 @@ export function FieldForm({
   template,
   onBack,
   onEditFields,
+  dashboardData,
+  onDashboardImported,
+  onDashboardPreviewClosed,
 }: FieldFormProps) {
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -631,8 +641,12 @@ export function FieldForm({
             </Button>
             <ImportEntriesDialog
               boxes={boxes}
+              employerFields={template.employerFields ?? []}
               existingEntryCount={entries.length}
               onImport={handleImportEntries}
+              dashboardData={dashboardData}
+              onDashboardImported={onDashboardImported}
+              onDashboardPreviewClosed={onDashboardPreviewClosed}
             />
 
             {entries.length === 0 ? (

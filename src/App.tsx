@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
-import { FileTextIcon } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { DownloadIcon, FileTextIcon } from "lucide-react";
 import { BoxEditor } from "@/components/BoxEditor";
 import { CompanyDetailsPanel } from "@/components/CompanyDetailsPanel";
+import { DashboardDataNotice } from "@/components/DashboardDataNotice";
 import { FieldForm } from "@/components/FieldForm";
 import { NewTemplateFlow } from "@/components/NewTemplateFlow";
 import { TemplateList } from "@/components/TemplateList";
+import { Button } from "@/components/ui/button";
+import { readDashboardPayroll, type DashboardPayroll } from "@/lib/payrollHub";
 import {
   deleteTemplate,
   getTemplate,
@@ -28,6 +31,64 @@ function App() {
 
   function refreshTemplates() {
     setTemplates(listTemplates());
+  }
+
+  // Everything below only ever does something inside the Payroll Hub
+  // dashboard's frame: opened on its own, the bridge stays silent, nothing
+  // is ever waiting, and none of the dashboard controls are rendered.
+  const insideDashboard = window.PayrollHubBridge.isEmbedded();
+
+  // Payroll results received from the dashboard and not imported yet. Kept
+  // in this state and nowhere else — no browser storage, no logging — so a
+  // page reload or Discard is the end of it.
+  const [waitingPayroll, setWaitingPayroll] = useState<DashboardPayroll | null>(
+    null,
+  );
+  // True once the import preview for the waiting data was closed without
+  // importing; the notice then offers to open it again.
+  const [previewClosed, setPreviewClosed] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+
+  // Throws when the rows can't be used, which is what tells the dashboard
+  // "Not delivered". Newer data replaces whatever was still waiting.
+  const receivePayroll = useCallback(
+    (payload: Parameters<typeof readDashboardPayroll>[0]) => {
+      setWaitingPayroll(readDashboardPayroll(payload));
+      setPreviewClosed(false);
+      setDashboardError(null);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    window.PayrollHubBridge.init({ appId: "pdf-editor", onData: receivePayroll });
+  }, [receivePayroll]);
+
+  async function handleGetFromDashboard() {
+    setRequesting(true);
+    setDashboardError(null);
+    const reply = await window.PayrollHubBridge.requestData("payroll-result");
+    setRequesting(false);
+
+    if (!reply.ok) {
+      setDashboardError(`Nothing received: ${reply.error}`);
+      return;
+    }
+    try {
+      receivePayroll(reply);
+    } catch (err) {
+      setDashboardError(
+        err instanceof Error
+          ? `Nothing received: ${err.message}`
+          : "Nothing received: this data couldn't be used.",
+      );
+    }
+  }
+
+  function discardWaitingPayroll() {
+    setWaitingPayroll(null);
+    setPreviewClosed(false);
   }
 
   const activeTemplate =
@@ -57,6 +118,18 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
+  // The import preview lives on a template's fill-in screen, and only once
+  // that template has fields to import into.
+  const canPreviewHere =
+    view.name === "fill" && (activeTemplate?.boxes.length ?? 0) > 0;
+  const waitingHint = !canPreviewHere
+    ? view.name === "fill"
+      ? "This template has no fields yet. Add fields, or open another template, to use it."
+      : "Open a template to fill in, and you'll be asked before anything is imported."
+    : previewClosed
+      ? "Not imported yet."
+      : "Check the preview to import it into this template.";
+
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <header className="border-b border-border bg-card">
@@ -67,15 +140,50 @@ function App() {
           <h1 className="text-base font-semibold tracking-tight text-foreground">
             Statement of Emoluments Tool
           </h1>
+          {insideDashboard && (
+            <Button
+              variant="outline"
+              className="ml-auto"
+              onClick={handleGetFromDashboard}
+              disabled={requesting}
+            >
+              <DownloadIcon />
+              {requesting ? "Waiting for the dashboard…" : "Get from dashboard"}
+            </Button>
+          )}
         </div>
       </header>
 
       <main className="flex flex-1 flex-col items-center gap-6 px-6 py-10">
+        {dashboardError && (
+          <p role="alert" className="text-sm text-destructive">
+            {dashboardError}
+          </p>
+        )}
+
+        {waitingPayroll && (
+          <DashboardDataNotice
+            data={waitingPayroll}
+            hint={waitingHint}
+            onReview={
+              canPreviewHere && previewClosed
+                ? () => setPreviewClosed(false)
+                : undefined
+            }
+            onDiscard={discardWaitingPayroll}
+          />
+        )}
+
         {view.name === "home" && (
           <TemplateList
             templates={templates}
             onNewTemplate={() => setView({ name: "new" })}
-            onFillTemplate={(id) => setView({ name: "fill", id })}
+            onFillTemplate={(id) => {
+              // Opening a template to fill in is the moment to offer
+              // whatever is waiting, even if its preview was closed earlier.
+              setPreviewClosed(false);
+              setView({ name: "fill", id });
+            }}
             onEditTemplate={(id) => setView({ name: "edit-boxes", id })}
             onCompanyDetails={(id) => setView({ name: "company-details", id })}
             onRenameTemplate={(id, name) => {
@@ -120,6 +228,9 @@ function App() {
             onEditFields={() =>
               setView({ name: "edit-boxes", id: activeTemplate.id })
             }
+            dashboardData={previewClosed ? null : waitingPayroll}
+            onDashboardImported={discardWaitingPayroll}
+            onDashboardPreviewClosed={() => setPreviewClosed(true)}
           />
         )}
       </main>

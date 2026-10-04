@@ -15,7 +15,7 @@ export type ParsedImport = {
 
 // Case/spacing-insensitive so "Basic Salary", "basicSalary", and
 // "basic_salary" all match the same field.
-function normalizeFieldKey(value: string): string {
+export function normalizeFieldKey(value: string): string {
   return value.trim().toLowerCase().replace(/[\s_-]+/g, "");
 }
 
@@ -107,18 +107,33 @@ function parseJsonRows(text: string): Record<string, string>[] {
   } catch {
     throw new ImportFileError("This file doesn't look like a valid JSON file.");
   }
+  return readRowList(data, "file");
+}
+
+// Everything a JSON import checks once the text has been parsed. Data that
+// arrives already parsed (from the Payroll Hub dashboard) comes through
+// here too, so it is held to exactly the same rules as a file — only the
+// wording differs, since there is no file to mention.
+function readRowList(
+  data: unknown,
+  source: "file" | "data",
+): Record<string, string>[] {
   if (!Array.isArray(data)) {
     throw new ImportFileError(
-      "This JSON file should contain a list of entries, one per person.",
+      source === "file"
+        ? "This JSON file should contain a list of entries, one per person."
+        : "This data should contain a list of entries, one per person.",
     );
   }
   if (data.length === 0) {
-    throw new ImportFileError("This file doesn't have any entries to import.");
+    throw new ImportFileError(
+      `This ${source} doesn't have any entries to import.`,
+    );
   }
   return data.map((item, index) => {
     if (typeof item !== "object" || item === null || Array.isArray(item)) {
       throw new ImportFileError(
-        `Entry ${index + 1} in this file isn't in the right format.`,
+        `Entry ${index + 1} in this ${source} isn't in the right format.`,
       );
     }
     const row: Record<string, string> = {};
@@ -172,4 +187,12 @@ export function parseImportFile(
 
   const rawRows = isJson ? parseJsonRows(text) : parseCsvRows(text);
   return matchRowsToBoxes(rawRows, boxes);
+}
+
+export function readImportRows(rows: unknown): Record<string, string>[] {
+  return readRowList(rows, "data");
+}
+
+export function parseImportRows(rows: unknown, boxes: FieldBox[]): ParsedImport {
+  return matchRowsToBoxes(readImportRows(rows), boxes);
 }
