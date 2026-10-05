@@ -550,3 +550,116 @@ test(
     await context.close();
   },
 );
+
+// Positions are the riskiest thing a restyle of the field editor could
+// disturb, so this records them at every step: after drawing a field, after
+// dragging it, after resizing it from two different corners, after a
+// reload, and after moving and resizing it again on the fill-in screen. It
+// then fills the field in and records where the value lands in the PDF.
+// All of it twice: on an upright page and on a page saved rotated by 90.
+test(
+  "field positions and sizes after dragging and resizing, on an upright and a rotated page",
+  TIMEOUT,
+  async () => {
+    const recording = {};
+
+    for (const [label, rotated] of [
+      ["upright page", false],
+      ["page saved rotated by 90 degrees", true],
+    ]) {
+      const pdf = await buildSamplePdf({ rotated });
+      const pdfFile = app.writeTempFile(rotated ? "fake-rotated.pdf" : "fake-upright.pdf", pdf);
+      const { context, page, outsideRequests } = await openApp([]);
+      const steps = {};
+      const settingsOpenedAfter = {};
+      const fields = async () =>
+        describeTemplates(await readStoredTemplates(page))[0].fields;
+
+      await page.getByRole("button", { name: "Upload a PDF", exact: true }).click();
+      await page.locator('input[type="file"]').setInputFiles(pdfFile);
+      await page.getByLabel("Template name").fill("Fake Form");
+      await page.getByRole("button", { name: "Save template" }).click();
+      await page.getByRole("heading", { name: "Fake Form" }).waitFor();
+      await waitForPdfPreview(page);
+
+      // Measured from the page's own top-left corner, as the editor does.
+      const canvas = page.locator("canvas").first();
+      async function drag(fromX, fromY, toX, toY) {
+        const box = await canvas.boundingBox();
+        const point = (x, y) => [box.x + x, box.y + y];
+        await page.mouse.move(...point(fromX, fromY));
+        await page.mouse.down();
+        await page.mouse.move(...point((fromX + toX) / 2, (fromY + toY) / 2), { steps: 5 });
+        await page.mouse.move(...point(toX, toY), { steps: 5 });
+        await page.mouse.up();
+      }
+      // Records whether letting go opened the field's settings (a known
+      // oddity, see docs/KNOWN_ISSUES.md), and closes them if so.
+      async function settle(step) {
+        await page.waitForTimeout(150);
+        settingsOpenedAfter[step] = await page.getByRole("dialog").count();
+        if (settingsOpenedAfter[step] > 0) {
+          await dialogButton(page, "Done");
+          await waitForNoDialog(page);
+        }
+      }
+      const save = (name) => page.getByRole("button", { name, exact: true }).click();
+
+      steps.pageShownAt = await canvas.evaluate((el) => `${el.width} x ${el.height}`);
+
+      // Draw: corners at (100,150) and (340,178) on the 800px-wide page.
+      await drag(100, 150, 340, 178);
+      await page.getByPlaceholder("e.g. Employee Name").fill("Surname");
+      await dialogButton(page, "Add field");
+      await waitForNoDialog(page);
+      await save("Save template");
+      steps.afterDrawing = await fields();
+
+      // Move by 60 right, 40 down: corners now (160,190) and (400,218).
+      await drag(220, 164, 280, 204);
+      await settle("moving in the editor");
+      await save("Save template");
+      steps.afterMoving = await fields();
+
+      // Resize from the bottom-right handle by 60 right, 20 down.
+      await drag(400, 218, 460, 238);
+      await settle("resizing from the bottom-right handle");
+      await save("Save template");
+      steps.afterResizingFromBottomRight = await fields();
+
+      // Resize from the top-left handle by 30 left, 10 up.
+      await drag(160, 190, 130, 180);
+      await settle("resizing from the top-left handle");
+      await save("Save template");
+      steps.afterResizingFromTopLeft = await fields();
+
+      await page.reload();
+      await page.getByText("Your templates").waitFor();
+      await loadWriterProbe(page, app.appUrl);
+      steps.afterReload = await fields();
+
+      // The fill-in screen can move and resize fields too, once unlocked.
+      await openFillScreen(page, "Fake Form");
+      await page.getByRole("button", { name: "Positions locked" }).click();
+      await drag(200, 200, 220, 230);
+      await settle("moving on the fill-in screen");
+      await drag(480, 268, 500, 280);
+      await settle("resizing on the fill-in screen");
+      steps.unsavedChangesShown = await page.getByText("Unsaved changes").count();
+      await save("Save changes to template");
+      steps.afterMovingAndResizingOnFillScreen = await fields();
+      await page.getByRole("button", { name: "Positions unlocked" }).click();
+
+      // And where a value typed into that field ends up in the PDF.
+      await page.getByLabel("Surname", { exact: true }).fill("Testperson");
+      steps.download = await downloadAndRead(page);
+      steps.settingsOpenedAfter = settingsOpenedAfter;
+
+      recording[label] = steps;
+      assert.deepEqual(outsideRequests, []);
+      await context.close();
+    }
+
+    checkRecording("field-positions-drag-and-resize", recording);
+  },
+);
