@@ -1,0 +1,244 @@
+{
+  "afterCreating": [
+    {
+      "name": "Fake Form",
+      "pdfFileName": "fake-form.pdf",
+      "pdfStoredUnchanged": true,
+      "fields": [],
+      "formValues": {},
+      "people": [],
+      "companyDetails": "not set"
+    }
+  ],
+  "unsavedChangesShown": 1,
+  "afterDrawingTwoFields": [
+    {
+      "name": "Fake Form",
+      "pdfFileName": "fake-form.pdf",
+      "pdfStoredUnchanged": true,
+      "fields": [
+        {
+          "name": "Surname",
+          "page": 1,
+          "fontSize": 12,
+          "fontFamily": "Helvetica",
+          "bold": false,
+          "align": "left",
+          "color": "#000000",
+          "validationType": "text",
+          "x": 74.38,
+          "y": 111.56,
+          "width": 178.5,
+          "height": 20.83
+        },
+        {
+          "name": "Basic Salary",
+          "page": 1,
+          "fontSize": 12,
+          "fontFamily": "Helvetica",
+          "bold": false,
+          "align": "left",
+          "color": "#000000",
+          "validationType": "amount",
+          "x": 74.38,
+          "y": 163.63,
+          "width": 119,
+          "height": 19.34
+        }
+      ],
+      "formValues": {},
+      "people": [],
+      "companyDetails": "not set"
+    }
+  ],
+  "fieldSettingsDialog": [
+    "text: \"Amount\" gently warns if what's typed doesn't look like a number — it never changes what you typed.",
+    "text: Alignment",
+    "text: Amount",
+    "text: Bold",
+    "text: Bold off",
+    "text: Center",
+    "text: Close",
+    "text: Controls how this field's text looks on the PDF, and whether we check it looks right while filling it in.",
+    "text: Courier",
+    "text: Done",
+    "text: Field settings — Surname",
+    "text: Field type",
+    "text: Font",
+    "text: Font size",
+    "text: Helvetica",
+    "text: Left",
+    "text: Right",
+    "text: Text",
+    "text: Text color",
+    "text: Times-Roman"
+  ],
+  "settingsOpenAfterDragging": 1,
+  "afterStyleMoveAndRename": [
+    {
+      "name": "Fake Form",
+      "pdfFileName": "fake-form.pdf",
+      "pdfStoredUnchanged": true,
+      "fields": [
+        {
+          "name": "Family Name",
+          "page": 1,
+          "fontSize": 14,
+          "fontFamily": "Courier",
+          "bold": true,
+          "align": "right",
+          "color": "#000000",
+          "validationType": "amount",
+          "x": 74.37,
+          "y": 111.56,
+          "width": 178.5,
+          "height": 20.83
+        },
+        {
+          "name": "Basic Salary",
+          "page": 1,
+          "fontSize": 12,
+          "fontFamily": "Helvetica",
+          "bold": false,
+          "align": "left",
+          "color": "#000000",
+          "validationType": "amount",
+          "x": 104.12,
+          "y": 185.94,
+          "width": 119,
+          "height": 19.34
+        }
+      ],
+      "formValues": {},
+      "people": [],
+      "companyDetails": "not set"
+    }
+  ],
+  "afterReload": [
+    {
+      "name": "Fake Form",
+      "pdfFileName": "fake-form.pdf",
+      "pdfStoredUnchanged": true,
+      "fields": [
+        {
+          "name": "Family Name",
+          "page": 1,
+          "fontSize": 14,
+          "fontFamily": "Courier",
+          "bold": true,
+          "align": "right",
+          "color": "#000000",
+          "validationType": "amount",
+          "x": 74.37,
+          "y": 111.56,
+          "width": 178.5,
+          "height": 20.83
+        },
+        {
+          "name": "Basic Salary",
+          "page": 1,
+          "fontSize": 12,
+          "fontFamily": "Helvetica",
+          "bold": false,
+          "align": "left",
+          "color": "#000000",
+          "validationType": "amount",
+          "x": 104.12,
+          "y": 185.94,
+          "width": 119,
+          "height": 19.34
+        }
+      ],
+      "formValues": {},
+      "people": [],
+      "companyDetails": "not set"
+    }
+  ],
+  "deleteFieldDialog": [
+    "text: Cancel",
+    "text: Close",
+    "text: Delete",
+    "text: Delete field?",
+    "text: This will remove the \"Basic Salary\" field from this template. You'll need to draw it again if you change your mind."
+  ],
+  "afterDeletingAField": [
+    {
+      "name": "Fake Form",
+      "pdfFileName": "fake-form.pdf",
+      "pdfStoredUnchanged": true,
+      "fields": [
+        {
+          "name": "Family Name",
+          "page": 1,
+          "fontSize": 14,
+          "fontFamily": "Courier",
+          "bold": true,
+          "align": "right",
+          "color": "#000000",
+          "validationType": "amount",
+          "x": 74.37,
+          "y": 111.56,
+          "width": 178.5,
+          "height": 20.83
+        }
+      ],
+      "formValues": {},
+      "people": [],
+      "companyDetails": "not set"
+    }
+  ],
+  "afterRenameAndCompanyDetails": [
+    {
+      "name": "Fake Form Renamed",
+      "pdfFileName": "fake-form.pdf",
+      "pdfStoredUnchanged": true,
+      "fields": [
+        {
+          "name": "Family Name",
+          "page": 1,
+          "fontSize": 14,
+          "fontFamily": "Courier",
+          "bold": true,
+          "align": "right",
+          "color": "#000000",
+          "validationType": "amount",
+          "x": 74.37,
+          "y": 111.56,
+          "width": 178.5,
+          "height": 20.83
+        }
+      ],
+      "formValues": {},
+      "people": [],
+      "companyDetails": [
+        {
+          "label": "Company Name",
+          "value": "Fakeco Test Ltd"
+        },
+        {
+          "label": "Address",
+          "value": ""
+        },
+        {
+          "label": "TAN",
+          "value": ""
+        },
+        {
+          "label": "BRN",
+          "value": "C00000001"
+        }
+      ]
+    }
+  ],
+  "fillScreenFieldNames": [
+    "Family Name"
+  ],
+  "deleteTemplateDialog": [
+    "text: Cancel",
+    "text: Close",
+    "text: Delete",
+    "text: Delete template?",
+    "text: This will permanently delete \"Fake Form Renamed\" and all its saved fields. This can't be undone."
+  ],
+  "afterDeletingTheTemplate": []
+}

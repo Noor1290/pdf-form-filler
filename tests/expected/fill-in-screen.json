@@ -1,0 +1,1182 @@
+{
+  "companyDetailsFilledInAutomatically": {
+    "Company Name": "Fakeco Test Ltd",
+    "TAN": "T00000001",
+    "Surname": "",
+    "Other Names": "",
+    "Basic Salary": "",
+    "Net Pay": ""
+  },
+  "onePersonForm": {
+    "Company Name": "Fakeco Test Ltd",
+    "TAN": "T00000001",
+    "Surname": "Testperson",
+    "Other Names": "Alpha",
+    "Basic Salary": "50,000.00",
+    "Net Pay": "43250.75"
+  },
+  "onePersonDownload": {
+    "fileName": "Fake_Form.pdf",
+    "handedToWriter": [
+      {
+        "page": 1,
+        "text": "Fakeco Test Ltd",
+        "x": 150,
+        "y": 740.12,
+        "size": 9,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "T00000001",
+        "x": 150,
+        "y": 714.8,
+        "size": 10,
+        "font": "Courier-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "Testperson",
+        "x": 150,
+        "y": 678.16,
+        "size": 12,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "Alpha",
+        "x": 150,
+        "y": 648.48,
+        "size": 11,
+        "font": "Times-Roman",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "50,000.00",
+        "x": 216,
+        "y": 589.8,
+        "size": 10,
+        "font": "Courier",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "43250.75",
+        "x": 334.98,
+        "y": 589.16,
+        "size": 12,
+        "font": "Helvetica-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0.10196078431372549,
+          "green": 0.23529411764705882,
+          "blue": 0.5607843137254902
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      }
+    ],
+    "readBack": [
+      {
+        "page": 1,
+        "rotation": 0,
+        "width": 595,
+        "height": 842,
+        "items": [
+          {
+            "text": "SAMPLE FORM - TEST DATA ONLY",
+            "x": 50,
+            "y": 800,
+            "size": 14,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employer:",
+            "x": 50,
+            "y": 745,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employee:",
+            "x": 50,
+            "y": 680,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Amounts:",
+            "x": 50,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Fakeco Test Ltd",
+            "x": 150,
+            "y": 740,
+            "size": 9,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "T00000001",
+            "x": 150,
+            "y": 715,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier-Bold"
+          },
+          {
+            "text": "Testperson",
+            "x": 150,
+            "y": 678,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Alpha",
+            "x": 150,
+            "y": 648.5,
+            "size": 11,
+            "angle": 0,
+            "font": "Times-Roman"
+          },
+          {
+            "text": "50,000.00",
+            "x": 216,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier"
+          },
+          {
+            "text": "43250.75",
+            "x": 335,
+            "y": 589,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica-Bold"
+          }
+        ]
+      }
+    ]
+  },
+  "formAfterAddAndFillNext": {
+    "Company Name": "Fakeco Test Ltd",
+    "TAN": "T00000001",
+    "Surname": "",
+    "Other Names": "",
+    "Basic Salary": "",
+    "Net Pay": ""
+  },
+  "amountWarningShown": 1,
+  "secondPersonTypedButNotAddedDownload": {
+    "fileName": "Fake_Form.pdf",
+    "handedToWriter": [
+      {
+        "page": 1,
+        "text": "Fakeco Test Ltd",
+        "x": 150,
+        "y": 740.12,
+        "size": 9,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "T00000001",
+        "x": 150,
+        "y": 714.8,
+        "size": 10,
+        "font": "Courier-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "Testperson",
+        "x": 150,
+        "y": 678.16,
+        "size": 12,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "Alpha",
+        "x": 150,
+        "y": 648.48,
+        "size": 11,
+        "font": "Times-Roman",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "50,000.00",
+        "x": 216,
+        "y": 589.8,
+        "size": 10,
+        "font": "Courier",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "43250.75",
+        "x": 334.98,
+        "y": 589.16,
+        "size": 12,
+        "font": "Helvetica-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0.10196078431372549,
+          "green": 0.23529411764705882,
+          "blue": 0.5607843137254902
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "Fakeco Test Ltd",
+        "x": 150,
+        "y": 740.12,
+        "size": 9,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "T00000001",
+        "x": 150,
+        "y": 714.8,
+        "size": 10,
+        "font": "Courier-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "Sampleton",
+        "x": 150,
+        "y": 678.16,
+        "size": 12,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "Beta Gamma",
+        "x": 150,
+        "y": 648.48,
+        "size": 11,
+        "font": "Times-Roman",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "61250.50",
+        "x": 222,
+        "y": 589.8,
+        "size": 10,
+        "font": "Courier",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "not a number",
+        "x": 322.06,
+        "y": 589.16,
+        "size": 12,
+        "font": "Helvetica-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0.10196078431372549,
+          "green": 0.23529411764705882,
+          "blue": 0.5607843137254902
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      }
+    ],
+    "readBack": [
+      {
+        "page": 1,
+        "rotation": 0,
+        "width": 595,
+        "height": 842,
+        "items": [
+          {
+            "text": "SAMPLE FORM - TEST DATA ONLY",
+            "x": 50,
+            "y": 800,
+            "size": 14,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employer:",
+            "x": 50,
+            "y": 745,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employee:",
+            "x": 50,
+            "y": 680,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Amounts:",
+            "x": 50,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Fakeco Test Ltd",
+            "x": 150,
+            "y": 740,
+            "size": 9,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "T00000001",
+            "x": 150,
+            "y": 715,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier-Bold"
+          },
+          {
+            "text": "Testperson",
+            "x": 150,
+            "y": 678,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Alpha",
+            "x": 150,
+            "y": 648.5,
+            "size": 11,
+            "angle": 0,
+            "font": "Times-Roman"
+          },
+          {
+            "text": "50,000.00",
+            "x": 216,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier"
+          },
+          {
+            "text": "43250.75",
+            "x": 335,
+            "y": 589,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica-Bold"
+          }
+        ]
+      },
+      {
+        "page": 2,
+        "rotation": 0,
+        "width": 595,
+        "height": 842,
+        "items": [
+          {
+            "text": "SAMPLE FORM - TEST DATA ONLY",
+            "x": 50,
+            "y": 800,
+            "size": 14,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employer:",
+            "x": 50,
+            "y": 745,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employee:",
+            "x": 50,
+            "y": 680,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Amounts:",
+            "x": 50,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Fakeco Test Ltd",
+            "x": 150,
+            "y": 740,
+            "size": 9,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "T00000001",
+            "x": 150,
+            "y": 715,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier-Bold"
+          },
+          {
+            "text": "Sampleton",
+            "x": 150,
+            "y": 678,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Beta Gamma",
+            "x": 150,
+            "y": 648.5,
+            "size": 11,
+            "angle": 0,
+            "font": "Times-Roman"
+          },
+          {
+            "text": "61250.50",
+            "x": 222,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier"
+          },
+          {
+            "text": "not a number",
+            "x": 322,
+            "y": 589,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica-Bold"
+          }
+        ]
+      }
+    ]
+  },
+  "peopleAfterAddingBoth": 2,
+  "personTwoForm": {
+    "Company Name": "Fakeco Test Ltd",
+    "TAN": "T00000001",
+    "Surname": "Sampleton",
+    "Other Names": "Beta Gamma",
+    "Basic Salary": "61250.50",
+    "Net Pay": "not a number"
+  },
+  "personOneFormAfterEdit": {
+    "Company Name": "Fakeco Test Ltd",
+    "TAN": "T00000001",
+    "Surname": "Testperson",
+    "Other Names": "Alpha",
+    "Basic Salary": "50,000.00",
+    "Net Pay": "44,000.00"
+  },
+  "twoPeopleDownload": {
+    "fileName": "Fake_Form.pdf",
+    "handedToWriter": [
+      {
+        "page": 1,
+        "text": "Fakeco Test Ltd",
+        "x": 150,
+        "y": 740.12,
+        "size": 9,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "T00000001",
+        "x": 150,
+        "y": 714.8,
+        "size": 10,
+        "font": "Courier-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "Testperson",
+        "x": 150,
+        "y": 678.16,
+        "size": 12,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "Alpha",
+        "x": 150,
+        "y": 648.48,
+        "size": 11,
+        "font": "Times-Roman",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "50,000.00",
+        "x": 216,
+        "y": 589.8,
+        "size": 10,
+        "font": "Courier",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "44,000.00",
+        "x": 333.31,
+        "y": 589.16,
+        "size": 12,
+        "font": "Helvetica-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0.10196078431372549,
+          "green": 0.23529411764705882,
+          "blue": 0.5607843137254902
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "Fakeco Test Ltd",
+        "x": 150,
+        "y": 740.12,
+        "size": 9,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "T00000001",
+        "x": 150,
+        "y": 714.8,
+        "size": 10,
+        "font": "Courier-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "Sampleton",
+        "x": 150,
+        "y": 678.16,
+        "size": 12,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "Beta Gamma",
+        "x": 150,
+        "y": 648.48,
+        "size": 11,
+        "font": "Times-Roman",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "61250.50",
+        "x": 222,
+        "y": 589.8,
+        "size": 10,
+        "font": "Courier",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "not a number",
+        "x": 322.06,
+        "y": 589.16,
+        "size": 12,
+        "font": "Helvetica-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0.10196078431372549,
+          "green": 0.23529411764705882,
+          "blue": 0.5607843137254902
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      }
+    ],
+    "readBack": [
+      {
+        "page": 1,
+        "rotation": 0,
+        "width": 595,
+        "height": 842,
+        "items": [
+          {
+            "text": "SAMPLE FORM - TEST DATA ONLY",
+            "x": 50,
+            "y": 800,
+            "size": 14,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employer:",
+            "x": 50,
+            "y": 745,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employee:",
+            "x": 50,
+            "y": 680,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Amounts:",
+            "x": 50,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Fakeco Test Ltd",
+            "x": 150,
+            "y": 740,
+            "size": 9,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "T00000001",
+            "x": 150,
+            "y": 715,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier-Bold"
+          },
+          {
+            "text": "Testperson",
+            "x": 150,
+            "y": 678,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Alpha",
+            "x": 150,
+            "y": 648.5,
+            "size": 11,
+            "angle": 0,
+            "font": "Times-Roman"
+          },
+          {
+            "text": "50,000.00",
+            "x": 216,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier"
+          },
+          {
+            "text": "44,000.00",
+            "x": 333.5,
+            "y": 589,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica-Bold"
+          }
+        ]
+      },
+      {
+        "page": 2,
+        "rotation": 0,
+        "width": 595,
+        "height": 842,
+        "items": [
+          {
+            "text": "SAMPLE FORM - TEST DATA ONLY",
+            "x": 50,
+            "y": 800,
+            "size": 14,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employer:",
+            "x": 50,
+            "y": 745,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employee:",
+            "x": 50,
+            "y": 680,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Amounts:",
+            "x": 50,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Fakeco Test Ltd",
+            "x": 150,
+            "y": 740,
+            "size": 9,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "T00000001",
+            "x": 150,
+            "y": 715,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier-Bold"
+          },
+          {
+            "text": "Sampleton",
+            "x": 150,
+            "y": 678,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Beta Gamma",
+            "x": 150,
+            "y": 648.5,
+            "size": 11,
+            "angle": 0,
+            "font": "Times-Roman"
+          },
+          {
+            "text": "61250.50",
+            "x": 222,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier"
+          },
+          {
+            "text": "not a number",
+            "x": 322,
+            "y": 589,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica-Bold"
+          }
+        ]
+      }
+    ]
+  },
+  "stored": [
+    {
+      "name": "Fake Form",
+      "pdfFileName": "fake-form.pdf",
+      "pdfStoredUnchanged": "not checked",
+      "fields": [
+        {
+          "name": "Company Name",
+          "page": 1,
+          "fontSize": 9,
+          "fontFamily": "Helvetica",
+          "bold": false,
+          "align": "left",
+          "color": "#000000",
+          "validationType": "text",
+          "x": 150,
+          "y": 90,
+          "width": 300,
+          "height": 18
+        },
+        {
+          "name": "TAN",
+          "page": 1,
+          "fontSize": 10,
+          "fontFamily": "Courier",
+          "bold": true,
+          "align": "left",
+          "color": "#000000",
+          "validationType": "text",
+          "x": 150,
+          "y": 115,
+          "width": 150,
+          "height": 18
+        },
+        {
+          "name": "Surname",
+          "page": 1,
+          "fontSize": 12,
+          "fontFamily": "Helvetica",
+          "bold": false,
+          "align": "left",
+          "color": "#000000",
+          "validationType": "text",
+          "x": 150,
+          "y": 150,
+          "width": 200,
+          "height": 20
+        },
+        {
+          "name": "Other Names",
+          "page": 1,
+          "fontSize": 11,
+          "fontFamily": "Times-Roman",
+          "bold": false,
+          "align": "left",
+          "color": "#000000",
+          "validationType": "text",
+          "x": 150,
+          "y": 180,
+          "width": 200,
+          "height": 20
+        },
+        {
+          "name": "Basic Salary",
+          "page": 1,
+          "fontSize": 10,
+          "fontFamily": "Courier",
+          "bold": false,
+          "align": "right",
+          "color": "#000000",
+          "validationType": "amount",
+          "x": 150,
+          "y": 240,
+          "width": 120,
+          "height": 18
+        },
+        {
+          "name": "Net Pay",
+          "page": 1,
+          "fontSize": 12,
+          "fontFamily": "Helvetica",
+          "bold": true,
+          "align": "center",
+          "color": "#1a3c8f",
+          "validationType": "amount",
+          "x": 300,
+          "y": 240,
+          "width": 120,
+          "height": 18
+        }
+      ],
+      "formValues": {
+        "Basic Salary": "50,000.00",
+        "Company Name": "Fakeco Test Ltd",
+        "Net Pay": "44,000.00",
+        "Other Names": "Alpha",
+        "Surname": "Testperson",
+        "TAN": "T00000001"
+      },
+      "people": [
+        {
+          "Basic Salary": "50,000.00",
+          "Company Name": "Fakeco Test Ltd",
+          "Net Pay": "44,000.00",
+          "Other Names": "Alpha",
+          "Surname": "Testperson",
+          "TAN": "T00000001"
+        },
+        {
+          "Basic Salary": "61250.50",
+          "Company Name": "Fakeco Test Ltd",
+          "Net Pay": "not a number",
+          "Other Names": "Beta Gamma",
+          "Surname": "Sampleton",
+          "TAN": "T00000001"
+        }
+      ],
+      "companyDetails": [
+        {
+          "label": "Company Name",
+          "value": "Fakeco Test Ltd"
+        },
+        {
+          "label": "Address",
+          "value": "1 Sample Street, Testville"
+        },
+        {
+          "label": "TAN",
+          "value": "T00000001"
+        },
+        {
+          "label": "BRN",
+          "value": "C00000001"
+        }
+      ]
+    }
+  ]
+}

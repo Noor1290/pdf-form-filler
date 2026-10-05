@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/safety-net.test.mjs",
+    "check:text": "node tests/visible-text.mjs",
+    "check:encoding": "node scripts/check-encoding.mjs",
+    "check:build": "node scripts/check-build.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -32,6 +36,7 @@
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
+    "playwright": "^1.63.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
   }
