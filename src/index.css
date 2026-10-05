@@ -2,129 +2,322 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 
-@custom-variant dark (&:is(.dark *));
+/* ------------------------------------------------------------------------
+   Design tokens, shared with Payroll Hub so the two read as one product.
+   These are the only place a raw colour value may appear: components use
+   the tokens (through the Tailwind names mapped further down), never hex.
 
+   Dark is the default. Light applies when the OS asks for it and no choice
+   has been made, or when data-theme="light" is set on the root.
+   ------------------------------------------------------------------------ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.546 0.215 262.5);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.94 0.03 262.5);
-  --accent-foreground: oklch(0.35 0.15 262.5);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.65 0.18 262.5);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  color-scheme: dark;
+  --canvas: #070b14; /* page background */
+  --elevated: #0d1424; /* dialogs, menus, sticky table headers */
+  --surface: rgb(148 170 215 / 0.055); /* cards, inputs, secondary buttons */
+  --surface-hover: rgb(148 170 215 / 0.1);
+  --line: rgb(148 170 215 / 0.14); /* borders */
+  --line-strong: rgb(148 170 215 / 0.28);
+  --fg: #e9eef8; /* main text */
+  --muted: #a3b0c8; /* secondary text */
+  --subtle: #7c8dab; /* placeholders, hints */
+  --accent: #2dd4a7; /* teal: primary actions, active state */
+  --accent-hover: #4be0b8;
+  --accent-fg: #03241b; /* text on accent */
+  --warn: #f5b544;
+  --danger: #fb7185;
+  --glow: #8b7cf6; /* violet: secondary highlight */
+  --sky: #5aa9ff;
+  --aurora-a: rgb(45 212 167 / 0.16);
+  --aurora-b: rgb(139 124 246 / 0.14);
+  --aurora-c: rgb(56 132 255 / 0.1);
+  --inner-glow: inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+  --shadow-pop: 0 24px 60px -20px rgb(0 0 0 / 0.7);
+
+  --radius: 0.5rem;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.65 0.19 262.5);
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.3 0.08 262.5);
-  --accent-foreground: oklch(0.9 0.06 262.5);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.6 0.18 262.5);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --canvas: #f3f5fa;
+    --elevated: #ffffff;
+    --surface: rgb(255 255 255 / 0.72);
+    --surface-hover: rgb(13 22 38 / 0.05);
+    --line: rgb(13 22 38 / 0.1);
+    --line-strong: rgb(13 22 38 / 0.22);
+    --fg: #0d1626;
+    --muted: #46546e;
+    --subtle: #5c6b87;
+    --accent: #077a5f;
+    --accent-hover: #066a52;
+    --accent-fg: #ffffff;
+    --warn: #96590a;
+    --danger: #be123c;
+    --glow: #6453c9;
+    --sky: #1d6fd1;
+    --aurora-a: rgb(7 122 95 / 0.12);
+    --aurora-b: rgb(100 83 201 / 0.1);
+    --aurora-c: rgb(56 132 255 / 0.08);
+    --inner-glow: inset 0 1px 0 0 rgb(255 255 255 / 0.8);
+    --shadow-pop: 0 24px 60px -24px rgb(13 22 38 / 0.28);
+  }
 }
 
+/* The PDF page is white paper in both themes, so anything drawn on top of
+   it (field outlines, name tags, drag handles) uses the light values:
+   they are the ones chosen to be readable on a light surface. */
+:root[data-theme="light"],
+.on-paper {
+  color-scheme: light;
+  --canvas: #f3f5fa;
+  --elevated: #ffffff;
+  --surface: rgb(255 255 255 / 0.72);
+  --surface-hover: rgb(13 22 38 / 0.05);
+  --line: rgb(13 22 38 / 0.1);
+  --line-strong: rgb(13 22 38 / 0.22);
+  --fg: #0d1626;
+  --muted: #46546e;
+  --subtle: #5c6b87;
+  --accent: #077a5f;
+  --accent-hover: #066a52;
+  --accent-fg: #ffffff;
+  --warn: #96590a;
+  --danger: #be123c;
+  --glow: #6453c9;
+  --sky: #1d6fd1;
+  --aurora-a: rgb(7 122 95 / 0.12);
+  --aurora-b: rgb(100 83 201 / 0.1);
+  --aurora-c: rgb(56 132 255 / 0.08);
+  --inner-glow: inset 0 1px 0 0 rgb(255 255 255 / 0.8);
+  --shadow-pop: 0 24px 60px -24px rgb(13 22 38 / 0.28);
+}
+
+/* Tailwind names for the tokens, e.g. bg-surface, text-muted, border-line. */
 @theme inline {
+  --color-canvas: var(--canvas);
+  --color-elevated: var(--elevated);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-glow: var(--glow);
+  --color-sky: var(--sky);
+
+  /* Names the screens were first written with, kept pointing at the same
+     tokens so nothing falls back to a colour of its own. */
+  --color-background: var(--canvas);
+  --color-foreground: var(--fg);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--fg);
+  --color-popover: var(--elevated);
+  --color-popover-foreground: var(--fg);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-fg);
+  --color-secondary: var(--surface);
+  --color-secondary-foreground: var(--fg);
+  --color-muted-foreground: var(--muted);
+  --color-destructive: var(--danger);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--accent);
+
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --font-heading: var(--font-sans);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-rise: rise 220ms ease-out backwards;
+
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
+    border-color: var(--line);
   }
   html {
-    @apply font-sans;
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background: var(--canvas);
+    color: var(--fg);
+  }
+  /* One focus ring for everything that can take focus. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  ::placeholder {
+    color: var(--subtle);
+    opacity: 1;
+  }
+}
+
+@layer components {
+  /* Glass card: side panels and notices. Never placed over a PDF page. */
+  .glass {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--inner-glow);
+    backdrop-filter: blur(18px) saturate(140%);
+  }
+  /* The frame around a PDF preview: a flat, opaque surface with no blur,
+     glow or tint, so the page looks exactly as it will print. */
+  .preview-frame {
+    background: var(--elevated);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 52px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--fg);
+  }
+
+  /* Tinted square (or round) holder for an icon. Takes its colour from
+     `color`, so `text-danger` or `text-warn` re-tints all of it. */
+  .icon-tile {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    color: var(--accent);
+    background: color-mix(in srgb, currentColor 14%, transparent);
+    border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  }
+  .icon-tile-round {
+    border-radius: 9999px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 10px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--muted);
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  }
+
+  /* Message panels: an icon and plain words, never colour alone. */
+  .notice-panel {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--fg);
+    background: color-mix(in srgb, var(--panel-tone) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--panel-tone) 40%, transparent);
+  }
+  .notice-panel > svg {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    color: var(--panel-tone);
+  }
+  .notice-danger {
+    --panel-tone: var(--danger);
+  }
+  .notice-warn {
+    --panel-tone: var(--warn);
+  }
+
+  .skeleton {
+    border-radius: 8px;
+    background: linear-gradient(
+      90deg,
+      var(--surface) 25%,
+      var(--surface-hover) 50%,
+      var(--surface) 75%
+    );
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
+  }
+
+  /* Numbers, ids, dates and codes. */
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Dialogs dim and blur what is behind them, except on a screen showing a
+   PDF preview (every such screen draws it on a canvas): there the overlay
+   only dims, so the document itself never looks blurred. Written outside
+   the layers above so it wins over the overlay's own blur utility. */
+body:has(canvas) [data-slot="dialog-overlay"] {
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
   }
 }

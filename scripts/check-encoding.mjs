@@ -34,7 +34,11 @@ const TEXT_FILE = /\.(ts|tsx|js|mjs|cjs|jsx|json|css|html|md|yml|yaml|svg|txt)$/
 const NOT_SCANNED = [/^docs\/Redesign prompt/i, /^hub_docs\//, /^package-lock\.json$/];
 
 const git = (...args) =>
-  execFileSync("git", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  execFileSync("git", args, {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "ignore"], // a new file has no earlier version; that is not an error
+  });
 
 const base = git("merge-base", "HEAD", "main").trim();
 const changed = new Set(

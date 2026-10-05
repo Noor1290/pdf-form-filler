@@ -393,6 +393,7 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
             </DialogDescription>
           </DialogHeader>
           <Input
+            aria-label="Name this field"
             value={pendingName}
             onChange={(event) => setPendingName(event.target.value)}
             placeholder="e.g. Employee Name"
@@ -453,6 +454,7 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
             </DialogDescription>
           </DialogHeader>
           <Input
+            aria-label="Rename field"
             value={renameValue}
             onChange={(event) => setRenameValue(event.target.value)}
             autoFocus

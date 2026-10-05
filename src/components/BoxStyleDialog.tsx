@@ -1,3 +1,4 @@
+import { SlidersHorizontalIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -43,7 +44,7 @@ export function BoxStyleDialog({ box, onChange, onClose }: BoxStyleDialogProps) 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
-        <DialogHeader>
+        <DialogHeader icon={<SlidersHorizontalIcon />}>
           <DialogTitle>Field settings — {box.name}</DialogTitle>
           <DialogDescription>
             Controls how this field's text looks on the PDF, and whether we
@@ -54,7 +55,7 @@ export function BoxStyleDialog({ box, onChange, onClose }: BoxStyleDialogProps) 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <span className="text-sm font-medium">Field type</span>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {VALIDATION_TYPES.map((type) => (
                 <Button
                   key={type.value}
@@ -79,7 +80,7 @@ export function BoxStyleDialog({ box, onChange, onClose }: BoxStyleDialogProps) 
 
           <div className="flex flex-col gap-1">
             <span className="text-sm font-medium">Font</span>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {FONT_FAMILIES.map((family) => (
                 <Button
                   key={family}
@@ -115,7 +116,7 @@ export function BoxStyleDialog({ box, onChange, onClose }: BoxStyleDialogProps) 
 
           <div className="flex flex-col gap-1">
             <span className="text-sm font-medium">Alignment</span>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {ALIGNMENTS.map((align) => (
                 <Button
                   key={align}
@@ -151,7 +152,7 @@ export function BoxStyleDialog({ box, onChange, onClose }: BoxStyleDialogProps) 
               type="color"
               value={box.color}
               onChange={(event) => update("color", event.target.value)}
-              className="h-8 w-14 cursor-pointer rounded border border-input"
+              className="h-8 w-14 cursor-pointer rounded border border-line bg-canvas/50"
             />
           </div>
         </div>

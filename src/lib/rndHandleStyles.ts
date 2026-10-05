@@ -6,8 +6,10 @@ const handleBase: CSSProperties = {
   width: 10,
   height: 10,
   borderRadius: 2,
-  background: "var(--color-primary)",
-  border: "1px solid var(--color-background)",
+  // Design tokens, read where the handle sits (on the page, so the light
+  // values apply): an accent square with a contrasting edge.
+  background: "var(--accent)",
+  border: "1px solid var(--accent-fg)",
 };
 
 export const resizeHandleStyles = {

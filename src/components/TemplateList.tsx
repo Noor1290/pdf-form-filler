@@ -73,7 +73,7 @@ export function TemplateList({
 
       {templates.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
-          <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+          <div className="flex size-12 items-center justify-center rounded-full bg-surface-hover">
             <FileStackIcon className="size-6 text-muted-foreground" />
           </div>
           <div className="flex flex-col gap-1">
@@ -93,7 +93,7 @@ export function TemplateList({
               key={template.id}
               className="flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 shadow-sm transition-colors hover:border-primary/40"
             >
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
                 <FileStackIcon className="size-5" />
               </div>
               <button
@@ -156,6 +156,7 @@ export function TemplateList({
             </DialogDescription>
           </DialogHeader>
           <Input
+            aria-label="Rename template"
             value={renameValue}
             onChange={(event) => setRenameValue(event.target.value)}
             autoFocus

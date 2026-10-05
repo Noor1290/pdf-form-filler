@@ -57,12 +57,13 @@ export async function startApp() {
   });
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pdf-filler-tests-"));
 
-  async function newContext() {
+  async function newContext(options = {}) {
     const context = await browser.newContext({
       locale: "en-US",
       timezoneId: "UTC",
       viewport: { width: 1440, height: 1000 },
       acceptDownloads: true,
+      ...options,
     });
     const outsideRequests = [];
     await context.route("**/*", (route) => {
