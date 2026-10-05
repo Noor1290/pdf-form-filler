@@ -9,6 +9,9 @@ import {
 type DashboardDataNoticeProps = {
   data: DashboardPayroll;
   hint: string;
+  // As wide as the screen it sits above: the fill-in screen is wide, the
+  // template list is narrower.
+  wide: boolean;
   // Only offered where the import preview can actually open (a template's
   // fill-in screen, after the preview was closed without importing).
   onReview?: () => void;
@@ -21,6 +24,7 @@ type DashboardDataNoticeProps = {
 export function DashboardDataNotice({
   data,
   hint,
+  wide,
   onReview,
   onDiscard,
 }: DashboardDataNoticeProps) {
@@ -33,7 +37,9 @@ export function DashboardDataNotice({
   return (
     <div
       role="status"
-      className="glass flex w-full max-w-296 flex-wrap items-center gap-3 border-accent/40 p-4"
+      className={`glass flex w-full flex-wrap items-center gap-3 border-accent/40 p-4 ${
+        wide ? "max-w-296" : "max-w-4xl"
+      }`}
     >
       <div className="icon-tile">
         <InboxIcon className="size-5" />

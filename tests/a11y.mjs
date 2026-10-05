@@ -59,13 +59,33 @@ function measureContrast() {
 
   // What is really behind an element: every ancestor's background colour,
   // from the page outwards in, each laid over the one before.
-  function backdrop(element) {
+  //
+  // On screens with the aurora background, a soft colour wash can drift
+  // behind any card. `washes` is one of the cases to assume: none of them,
+  // one at full strength, or any two overlapping at full strength. (The
+  // three sit in different corners and never all overlap.)
+  const aurora = Array.from(document.querySelectorAll(".app-backdrop > span")).map((wash) => {
+    const style = getComputedStyle(wash);
+    const colour = rgba(style.backgroundColor);
+    return { ...colour, a: colour.a * Number(style.opacity) };
+  });
+  const washCases = [[]];
+  aurora.forEach((first, i) => {
+    washCases.push([first]);
+    aurora.slice(i + 1).forEach((second) => washCases.push([first, second]));
+  });
+
+  function backdrop(element, washes) {
     const chain = [];
     for (let e = element; e; e = e.parentElement) chain.unshift(e);
     let colour = { r: 255, g: 255, b: 255, a: 1 };
     for (const e of chain) {
       const bg = rgba(getComputedStyle(e).backgroundColor);
       if (bg.a > 0) colour = over(bg, colour);
+      // The washes sit directly on the page background, under everything else.
+      if (e.querySelector(":scope > .app-backdrop")) {
+        for (const wash of washes) colour = over(wash, colour);
+      }
     }
     return colour;
   }
@@ -96,17 +116,23 @@ function measureContrast() {
     }
     if (samples.length === 0) continue;
 
-    const behind = backdrop(element);
     const size = parseFloat(style.fontSize);
     const bold = Number(style.fontWeight) >= 700;
     const large = size >= 24 || (size >= 18.66 && bold);
     for (const sample of samples) {
-      const front = over(rgba(sample.colour), behind);
+      // Keep the worst of the background cases.
+      let worst = null;
+      for (const washes of washCases) {
+        const behind = backdrop(element, washes);
+        const front = over(rgba(sample.colour), behind);
+        const value = ratio(front, behind);
+        if (!worst || value < worst.value) worst = { value, front, behind };
+      }
       results.push({
         text: sample.what.slice(0, 60),
-        ratio: Math.round(ratio(front, behind) * 100) / 100,
+        ratio: Math.round(worst.value * 100) / 100,
         needs: large ? 3 : 4.5,
-        colours: `${hex(front)} on ${hex(behind)}`,
+        colours: `${hex(worst.front)} on ${hex(worst.behind)}`,
       });
     }
   }
@@ -202,14 +228,16 @@ async function inspect(target, state) {
 }
 
 // Inside a dialog, start from wherever the dialog put the focus.
-async function tabThroughEverything(page, state, { fromTheTop = true } = {}) {
-  if (fromTheTop) await page.evaluate(() => document.activeElement?.blur());
+// `target` is where the app is: the page itself, or its frame when the app
+// is inside the stand-in dashboard.
+async function tabThroughEverything(page, state, { fromTheTop = true, target = page } = {}) {
+  if (fromTheTop) await target.evaluate(() => document.activeElement?.blur());
   const seen = new Set();
   let checked = 0;
   for (let i = 0; i < 80; i++) {
     await page.keyboard.press("Tab");
     await page.waitForTimeout(40);
-    const ring = await page.evaluate(focusRingOfActiveElement);
+    const ring = await target.evaluate(focusRingOfActiveElement);
     if (!ring) continue;
     const key = `${ring.element}`;
     if (seen.has(key) && seen.size > 3) break;
@@ -391,6 +419,78 @@ async function fillInScreen(app) {
   return summary;
 }
 
+async function homeScreen(app) {
+  const pdf = await buildSamplePdf();
+  const summary = { dialogs: {} };
+  const templates = [
+    makeTemplate(pdf, { employerFields: COMPANY_DETAILS }),
+    makeTemplate(pdf, { id: "tpl-blank", name: "Blank Form", boxes: [] }),
+  ];
+
+  const { context } = await app.newContext();
+  const page = await context.newPage();
+  await page.goto(app.appUrl);
+  await page.getByText("Your templates").waitFor();
+  await seedTemplates(page, []);
+  await page.getByText("No templates yet").waitFor();
+  summary.focusStops = await tabThroughEverything(page, "home: no templates");
+  await seedTemplates(page, templates);
+  await page.getByText("Blank Form").waitFor();
+  summary.focusStops += await tabThroughEverything(page, "home");
+  for (const opener of ["Rename", "Delete"]) {
+    summary.dialogs[opener] = await dialogRoundTrip(page, opener, `home: ${opener}`);
+  }
+  await context.close();
+
+  // Inside the stand-in dashboard: the header button and the waiting notice.
+  const embedded = await app.newContext();
+  const outer = await embedded.context.newPage();
+  await outer.goto(STANDIN_URL);
+  const frame = await (await outer.locator("#app").elementHandle()).contentFrame();
+  await frame.getByText("Your templates").waitFor();
+  await seedTemplates(frame, templates);
+  await frame.getByText("Blank Form").waitFor();
+  await outer.evaluate(
+    (rows) =>
+      window.hub.send(
+        "send-data",
+        { dataType: "payroll-result", rows, meta: { period: "2026-10" } },
+        "a11y-check-delivery-2",
+      ),
+    OTHER_PAYROLL_ROWS,
+  );
+  await frame.locator('[role="status"]').waitFor();
+  await frame.getByRole("heading", { name: "Your templates" }).click();
+  summary.focusStops += await tabThroughEverything(outer, "home in dashboard, data waiting", {
+    target: frame,
+  });
+  await embedded.context.close();
+
+  // Reduce motion: the drifting background has to stop too.
+  const still = await app.newContext({ reducedMotion: "reduce" });
+  const stillPage = await still.context.newPage();
+  await stillPage.goto(app.appUrl);
+  await stillPage.getByText("Your templates").waitFor();
+  await seedTemplates(stillPage, templates);
+  await stillPage.getByText("Blank Form").waitFor();
+  summary.stillMovingWithReduceMotion = await stillPage.evaluate(movingThings);
+  await still.context.close();
+
+  const moving = await app.newContext();
+  const movingPage = await moving.context.newPage();
+  await movingPage.goto(app.appUrl);
+  await movingPage.getByText("Your templates").waitFor();
+  await seedTemplates(movingPage, templates);
+  await movingPage.getByText("Blank Form").waitFor();
+  summary.movingNormally = (await movingPage.evaluate(movingThings)).length;
+  await moving.context.close();
+
+  for (const thing of summary.stillMovingWithReduceMotion) {
+    report.problems.push(`home still moves with "reduce motion": ${thing}`);
+  }
+  return summary;
+}
+
 // Contrast and control names on every screen and dialog, including the
 // ones not restyled yet: the colour tokens are shared, so a change to them
 // reaches all of them.
@@ -399,7 +499,11 @@ async function everyScreen(app) {
   return null;
 }
 
-const SCREENS = { "fill-in screen": fillInScreen, "every screen (contrast and names)": everyScreen };
+const SCREENS = {
+  "fill-in screen": fillInScreen,
+  "home screen": homeScreen,
+  "every screen (contrast and names)": everyScreen,
+};
 
 const app = await startApp();
 const summaries = {};

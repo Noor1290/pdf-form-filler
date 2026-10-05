@@ -1,7 +1,8 @@
 # Known issues
 
 Things noticed during the visual redesign that are about behaviour, not looks.
-None of them were changed by the redesign. Each needs a decision before it is
+Apart from the short list under "Fixed during the redesign" at the end, none
+of them were changed by the redesign. Each needs a decision before it is
 fixed. All evidence below uses fake data.
 
 ## 1. Moving a field opens its settings
@@ -20,10 +21,12 @@ itself is saved correctly (x 74.38 to 104.12, y 163.63 to 185.94 points).
 **Likely cause:** the field reacts to the click that ends the drag the same way
 it reacts to a plain click.
 
-## 2. A person being typed in is lost by clicking another person
+## 2. A person being typed in is lost by clicking another person, or by "Clear all"
 
-**Priority: HIGH.** It silently loses data someone has just typed. To be fixed
-on its own branch after the redesign.
+**Priority: HIGH**, both routes (2a and 2b below). They silently lose data
+someone has just typed. To be fixed on their own branch after the redesign.
+
+### 2a. Clicking another person
 
 **Where:** fill-in screen, People list.
 
@@ -58,11 +61,17 @@ before throwing the typed values away.
 Actual: the form shows "Testperson" again, the People list still has only
 "Person 1", and "Sampleton" is gone.
 
-Related: pressing "Clear all" at step 5 instead also empties the form. It asks
-first, but the confirmation only counts the people in the list ("This will
-remove everyone added to this batch (1 person)."), not the one being typed.
-Reproduced with the same fake data: after confirming, 0 people are listed and
-the Surname box is empty.
+### 2b. Pressing "Clear all" (also HIGH)
+
+Follow steps 1 to 4 above, then press "Clear all" and confirm.
+
+Expected: the confirmation says that the person being typed will be thrown
+away too, or keeps them.
+
+Actual: the confirmation only counts the people in the list ("This will
+remove everyone added to this batch (1 person)."), and confirming also empties
+the form. Reproduced with the same fake data: afterwards 0 people are listed
+and the Surname box is empty.
 
 **Where in the code:** the function handleSelectEntry in
 src/components/FieldForm.tsx. When no listed person is selected (the form
@@ -95,3 +104,26 @@ and its dialogs; none of them is a field outline.
 
 **Why it was left:** making the outlines focusable and giving them key
 handling is new behaviour, not styling.
+
+## Fixed during the redesign
+
+Small behaviour changes made on purpose, each approved, because the redesign's
+keyboard rules required them.
+
+### Focus returns to the Rename button (home screen)
+
+**Before:** closing the "Rename template" dialog (Escape, Cancel or Save) left
+keyboard focus on the page itself, so the next Tab started again from the top.
+Measured on the commit before the redesign (8aad0f4): focus was on the page
+body after closing.
+
+**Now:** focus goes back to the Rename button that opened the dialog. The
+dialog still opens with the cursor in the name box.
+
+**What changed:** the name box no longer asks for focus itself (autoFocus
+removed); the dialog places focus when it opens and returns it when it
+closes. Only where focus lands changed, nothing about renaming.
+
+**Still to do:** the field editor's "Name this field" and "Rename field"
+dialogs have the same quirk. They get the same change when that screen is
+restyled, and will be listed here then.

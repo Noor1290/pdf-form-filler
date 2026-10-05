@@ -132,7 +132,17 @@ function App() {
       : "Check the preview to import it into this template.";
 
   return (
-    <div className="flex min-h-svh flex-col bg-canvas">
+    <div className="relative isolate flex min-h-svh flex-col bg-canvas">
+      {/* Soft colour washes and a faint grid behind the content, for depth.
+          Only on screens with no PDF on them: wherever a document is
+          previewed, the background stays plain. */}
+      {(view.name === "home" || view.name === "company-details") && (
+        <div aria-hidden="true" className="app-backdrop">
+          <span />
+          <span />
+          <span />
+        </div>
+      )}
       <header className="border-b border-line bg-elevated">
         <div className="mx-auto flex max-w-296 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6">
           <div className="icon-tile size-9 rounded-lg">
@@ -169,6 +179,7 @@ function App() {
           <DashboardDataNotice
             data={waitingPayroll}
             hint={waitingHint}
+            wide={view.name === "fill"}
             onReview={
               canPreviewHere && previewClosed
                 ? () => setPreviewClosed(false)

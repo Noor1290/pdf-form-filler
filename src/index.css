@@ -282,6 +282,57 @@
     --panel-tone: var(--warn);
   }
 
+  /* Page background on screens without a PDF: a very faint grid and three
+     large, soft, slowly drifting washes of the aurora colours. It sits
+     behind everything and never takes a click. */
+  .app-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .app-backdrop::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 56px 56px;
+    opacity: 0.4;
+    mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 78%);
+  }
+  .app-backdrop > span {
+    position: absolute;
+    width: 60vmax;
+    height: 60vmax;
+    border-radius: 9999px;
+    filter: blur(80px);
+    /* 55% of token strength: at full strength the red "Delete" text drops
+       below AA contrast (3.3:1) where two washes overlap behind a card. */
+    opacity: 0.55;
+    animation: aurora-drift 38s ease-in-out infinite alternate;
+  }
+  .app-backdrop > span:nth-child(1) {
+    top: -28vmax;
+    left: -12vmax;
+    background: var(--aurora-a);
+  }
+  .app-backdrop > span:nth-child(2) {
+    top: -14vmax;
+    right: -22vmax;
+    background: var(--aurora-b);
+    animation-duration: 46s;
+    animation-direction: alternate-reverse;
+  }
+  .app-backdrop > span:nth-child(3) {
+    bottom: -38vmax;
+    left: 22vmax;
+    background: var(--aurora-c);
+    animation-duration: 54s;
+  }
+
   .skeleton {
     border-radius: 8px;
     background: linear-gradient(
@@ -298,6 +349,15 @@
   .num {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes aurora-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(4vmax, 3vmax, 0) scale(1.08);
   }
 }
 
