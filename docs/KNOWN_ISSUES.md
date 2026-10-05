@@ -105,6 +105,19 @@ and its dialogs; none of them is a field outline.
 **Why it was left:** making the outlines focusable and giving them key
 handling is new behaviour, not styling.
 
+## 5. Short fields look like two lines in the field editor (cosmetic)
+
+**Where:** field editor, and the fill-in screen with positions unlocked.
+
+**What happens:** a field that is only about 20px tall shows as two horizontal
+lines with squares on them, rather than an obvious box. Its drag handles (10px
+squares at each corner and the middle of each side) cover most of the short
+left and right sides, and since the redesign the box has no fill.
+
+**Why it was left:** the handles are part of resizing and were not touched,
+and field outlines stay a thin line with no fill so nothing tints the page.
+Looks only; nothing is drawn or saved differently.
+
 ## Fixed during the redesign
 
 Small behaviour changes made on purpose, each approved, because the redesign's
@@ -124,6 +137,18 @@ dialog still opens with the cursor in the name box.
 removed); the dialog places focus when it opens and returns it when it
 closes. Only where focus lands changed, nothing about renaming.
 
-**Still to do:** the field editor's "Name this field" and "Rename field"
-dialogs have the same quirk. They get the same change when that screen is
-restyled, and will be listed here then.
+### Focus returns after "Rename field"; "Name this field" manages its own focus (field editor)
+
+**Before:** both dialogs had the same quirk as "Rename template" above: their
+text box asked for focus itself, so closing the dialog left keyboard focus on
+the page.
+
+**Now:** closing "Rename field" (Escape, Cancel or Save) returns focus to the
+"Rename field" button that opened it. "Name this field" opens when a box has
+been drawn with the mouse, so there is no button to return to; it still opens
+with the cursor in the name box, Tab stays inside it, and Escape closes it.
+
+**What changed:** autoFocus removed from the two text boxes in
+src/components/BoxEditor.tsx. Nothing about naming or renaming a field
+changed, and no drag, resize or position code was touched (the safety net's
+position recordings are unchanged).

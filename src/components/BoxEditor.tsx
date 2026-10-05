@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Rnd } from "react-rnd";
-import { LayersIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import {
+  CircleAlertIcon,
+  LayersIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { BoxStyleDialog } from "@/components/BoxStyleDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -230,23 +236,19 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
   }
 
   return (
-    <div className="flex w-full max-w-5xl flex-col gap-4">
-      <div className="flex w-full items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
+    <div className="flex w-full max-w-296 flex-col gap-5">
+      <div className="flex w-full animate-rise flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="text-2xl font-semibold tracking-tight text-fg">
             {template.name}
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted">
             Click and drag on the PDF to add a field. Click an existing field
             to change its font, size, color, or alignment.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-3">
-          {dirty && (
-            <span className="text-sm text-muted-foreground">
-              Unsaved changes
-            </span>
-          )}
+        <div className="flex flex-wrap items-center gap-2">
+          {dirty && <span className="badge text-warn">Unsaved changes</span>}
           <Button onClick={handleSave} disabled={saving || !dirty}>
             {saving ? "Saving…" : "Save template"}
           </Button>
@@ -256,19 +258,43 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
         </div>
       </div>
 
-      <div className="flex w-full items-start gap-6">
-        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      {/* Directly under the title, so it is seen at once at any window width. */}
+      {error && (
+        <p className="notice-panel notice-danger">
+          <CircleAlertIcon />
+          {error}
+        </p>
+      )}
+
+      <div className="flex w-full flex-col items-start gap-5 xl:flex-row xl:justify-between">
+        {/* The page keeps its true size at every window width and scrolls
+            sideways inside this frame when the window is narrower than it.
+            Nothing here blurs, tints or overlays the page; field outlines
+            are a thin accent line with no fill, and are never printed. */}
+        <div className="preview-frame max-w-full overflow-x-auto p-4">
           <div
-            className="relative shrink-0 select-none"
+            className={
+              canvasSize || error
+                ? "on-paper relative shrink-0 select-none"
+                : "on-paper relative h-140 w-200 shrink-0 select-none"
+            }
             style={
               canvasSize
                 ? { width: canvasSize.width, height: canvasSize.height }
                 : undefined
             }
           >
+            {/* Shown only until the page has been drawn, in its place. */}
+            {!canvasSize && !error && (
+              <div aria-hidden="true" className="skeleton absolute inset-0" />
+            )}
             <canvas
               ref={canvasRef}
-              className="rounded-lg border border-border"
+              className={
+                canvasSize
+                  ? "rounded-lg border border-border"
+                  : "invisible rounded-lg border border-border"
+              }
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
@@ -277,7 +303,7 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
 
             {draftRect && (
               <div
-                className="pointer-events-none absolute border-2 border-dashed border-primary bg-primary/10"
+                className="pointer-events-none absolute border-2 border-dashed border-accent"
                 style={{
                   left: draftRect.x,
                   top: draftRect.y,
@@ -321,13 +347,13 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
                       })
                     }
                     resizeHandleStyles={resizeHandleStyles}
-                    className="group border-2 border-primary bg-primary/10 hover:bg-primary/20"
+                    className="group border-2 border-accent"
                   >
                     <div
                       className="h-full w-full cursor-pointer"
                       onClick={() => setEditingBoxId(box.id)}
                     >
-                      <span className="pointer-events-none absolute -top-6 left-0 rounded bg-primary px-1.5 py-0.5 text-xs whitespace-nowrap text-primary-foreground">
+                      <span className="pointer-events-none absolute -top-6 left-0 rounded bg-accent px-1.5 py-0.5 text-xs whitespace-nowrap text-accent-fg">
                         {box.name}
                       </span>
                     </div>
@@ -337,23 +363,27 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
           </div>
         </div>
 
-        <div className="flex w-64 shrink-0 flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-foreground">Fields</h3>
+        <section className="glass flex w-full min-w-0 shrink-0 animate-rise flex-col xl:w-80">
+          <div className="card-header">
+            <h3 className="card-title">Fields</h3>
+          </div>
           {boxes.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border p-6 text-center">
-              <LayersIcon className="size-5 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
+            <div className="m-4 flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-6 text-center">
+              <div className="icon-tile">
+                <LayersIcon className="size-5" />
+              </div>
+              <p className="text-sm text-muted">
                 No fields yet — draw a box on the PDF to add one.
               </p>
             </div>
           ) : (
-            <ul className="flex flex-col gap-1.5">
+            <ul className="flex flex-col gap-1.5 p-4">
               {sortBoxesByPosition(boxes).map((box) => (
                 <li
                   key={box.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border px-2.5 py-1.5"
+                  className="flex items-center justify-between gap-2 rounded-lg border border-line py-1 pr-1 pl-3 transition-colors duration-150 hover:bg-surface-hover"
                 >
-                  <span className="truncate text-sm">{box.name}</span>
+                  <span className="truncate text-sm text-fg">{box.name}</span>
                   <div className="flex shrink-0 gap-1">
                     <Button
                       variant="ghost"
@@ -369,24 +399,22 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
                       aria-label={`Delete field "${box.name}"`}
                       onClick={() => setDeletingBox(box)}
                     >
-                      <Trash2Icon className="text-destructive" />
+                      <Trash2Icon className="text-danger" />
                     </Button>
                   </div>
                 </li>
               ))}
             </ul>
           )}
-        </div>
+        </section>
       </div>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <Dialog
         open={pendingBox !== null}
         onOpenChange={(open) => !open && setPendingBox(null)}
       >
         <DialogContent>
-          <DialogHeader>
+          <DialogHeader icon={<PlusIcon />}>
             <DialogTitle>Name this field</DialogTitle>
             <DialogDescription>
               This name will show up on the fill-in form later.
@@ -397,7 +425,6 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
             value={pendingName}
             onChange={(event) => setPendingName(event.target.value)}
             placeholder="e.g. Employee Name"
-            autoFocus
             onKeyDown={(event) => {
               if (event.key === "Enter") confirmNewBox();
             }}
@@ -418,7 +445,7 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
         onOpenChange={(open) => !open && setDeletingBox(null)}
       >
         <DialogContent>
-          <DialogHeader>
+          <DialogHeader icon={<Trash2Icon />} tone="danger">
             <DialogTitle>Delete field?</DialogTitle>
             <DialogDescription>
               This will remove the "{deletingBox?.name}" field from this
@@ -447,7 +474,7 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
         onOpenChange={(open) => !open && setRenamingBox(null)}
       >
         <DialogContent>
-          <DialogHeader>
+          <DialogHeader icon={<PencilIcon />}>
             <DialogTitle>Rename field</DialogTitle>
             <DialogDescription>
               Choose a new name for "{renamingBox?.name}".
@@ -457,7 +484,6 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
             aria-label="Rename field"
             value={renameValue}
             onChange={(event) => setRenameValue(event.target.value)}
-            autoFocus
             onKeyDown={(event) => {
               if (event.key === "Enter") confirmRenameBox();
             }}

@@ -132,6 +132,57 @@ try {
     await context.close();
   }
 
+  // The field editor: same rules, with the fields drawn on the page. The
+  // only things allowed on top of it are the field outlines (no fill).
+  for (const width of [1440, 720, 420]) {
+    const { context } = await app.newContext({ viewport: { width, height: 900 } });
+    const page = await context.newPage();
+    await page.goto(app.appUrl);
+    await page.getByText("Your templates").waitFor();
+    await seedTemplates(page, [makeTemplate(pdf, { employerFields: COMPANY_DETAILS })]);
+    await page.getByRole("button", { name: "Edit fields" }).click();
+    await waitForPdfPreview(page);
+
+    const layout = await page.evaluate(inspectLayout);
+    const outlines = await page.evaluate(() => {
+      const paint = document.createElement("canvas").getContext("2d");
+      return Array.from(document.querySelectorAll(".react-draggable")).map((el) => {
+        const style = getComputedStyle(el);
+        paint.clearRect(0, 0, 1, 1);
+        paint.fillStyle = style.backgroundColor;
+        paint.fillRect(0, 0, 1, 1);
+        return {
+          line: style.borderTopWidth,
+          filled: paint.getImageData(0, 0, 1, 1).data[3] > 0,
+          glow: style.boxShadow !== "none",
+        };
+      });
+    });
+    let effects = 0;
+    for (const theme of ["dark", "light"]) {
+      await page.evaluate((t) => (document.documentElement.dataset.theme = t), theme);
+      const preview = await page.evaluate(inspectPreview);
+      effects += preview.problems.length;
+      if (preview.drawnAt !== "800px" || preview.shownAt !== "800px") {
+        problems.push(`field editor, ${width}px: page drawn at ${preview.drawnAt}, shown at ${preview.shownAt}`);
+      }
+      for (const problem of preview.problems) problems.push(`field editor, ${theme}, ${width}px: ${problem}`);
+    }
+    const lines = [...new Set(outlines.map((o) => o.line))].join(", ");
+    console.log(
+      `Field editor, width ${String(width).padStart(4)}px: page drawn and shown at 800px, effects on it ${effects}, ` +
+        `${outlines.length} field outlines (${lines} line, filled ${outlines.filter((o) => o.filled).length}, ` +
+        `glow ${outlines.filter((o) => o.glow).length}), page scrolls sideways ${layout.pageScrollsSideways ? "YES" : "no"}, ` +
+        `controls cut off: ${layout.controlsCutOff.length}`,
+    );
+    if (outlines.some((o) => o.filled || o.glow || parseFloat(o.line) > 2)) {
+      problems.push(`field editor, ${width}px: a field outline has a fill, a glow or a line thicker than 2px`);
+    }
+    if (layout.pageScrollsSideways) problems.push(`field editor: at ${width}px the whole page scrolls sideways`);
+    for (const control of layout.controlsCutOff) problems.push(`field editor: at ${width}px "${control}" is cut off`);
+    await context.close();
+  }
+
   // The new-template screen: the same rules for its preview. Here the page
   // is drawn at 800px and, as before the redesign, shown smaller only when
   // the window is too narrow for it (it shrinks to fit, never crops).

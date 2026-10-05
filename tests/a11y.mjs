@@ -269,9 +269,16 @@ async function dialogRoundTrip(page, openerName, state) {
     await page.waitForTimeout(40);
     // A guard at each end of the dialog passes focus back in; give it a
     // moment before deciding focus has escaped.
+    for (let waited = 0; !(await inside()) && waited < 600; waited += 100) {
+      await page.waitForTimeout(100);
+    }
     if (!(await inside())) {
-      await page.waitForTimeout(150);
-      if (!(await inside())) checks.tabStaysInside = false;
+      checks.tabStaysInside = false;
+      const where = await page.evaluate(() => {
+        const el = document.activeElement;
+        return `${el?.tagName} "${(el?.getAttribute("aria-label") || el?.textContent || "").trim().slice(0, 30)}"`;
+      });
+      report.problems.push(`dialog [${state}] after ${i + 1} Tab presses focus was on ${where}`);
     }
   }
   await page.keyboard.press("Escape");
@@ -534,6 +541,72 @@ async function newTemplateScreen(app) {
   return summary;
 }
 
+async function fieldEditorScreen(app) {
+  const pdf = await buildSamplePdf();
+  const summary = { dialogs: {}, focusStops: 0 };
+  const templates = [makeTemplate(pdf, { employerFields: COMPANY_DETAILS })];
+
+  async function open(options) {
+    const { context } = await app.newContext(options);
+    const page = await context.newPage();
+    await page.goto(app.appUrl);
+    await page.getByText("Your templates").waitFor();
+    await seedTemplates(page, templates);
+    await page.getByRole("button", { name: "Edit fields" }).click();
+    await waitForPdfPreview(page);
+    return { context, page };
+  }
+
+  const { context, page } = await open();
+  summary.focusStops += await tabThroughEverything(page, "field editor");
+  for (const opener of ['Rename field "Surname"', 'Delete field "Surname"']) {
+    summary.dialogs[opener] = await dialogRoundTrip(page, opener, `field editor: ${opener}`);
+  }
+
+  // "Name this field" opens when a box has been drawn with the mouse, so
+  // there is no button for focus to return to. Checked here: the cursor
+  // starts in the name box, Tab stays inside, Escape closes it.
+  const canvas = await page.locator("canvas").first().boundingBox();
+  await page.mouse.move(canvas.x + 420, canvas.y + 420);
+  await page.mouse.down();
+  await page.mouse.move(canvas.x + 520, canvas.y + 440, { steps: 6 });
+  await page.mouse.up();
+  await page.getByRole("dialog").waitFor();
+  await page.waitForTimeout(250);
+  const naming = {
+    cursorStartsInNameBox: await page.evaluate(
+      () => document.activeElement?.getAttribute("aria-label") === "Name this field",
+    ),
+    tabStaysInside: true,
+  };
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(40);
+    const inside = () => page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'));
+    if (!(await inside())) {
+      await page.waitForTimeout(150);
+      if (!(await inside())) naming.tabStaysInside = false;
+    }
+  }
+  await page.keyboard.press("Escape");
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  naming.escapeCloses = (await page.getByRole("dialog").count()) === 0;
+  summary.dialogs["Name this field (opened by drawing a box)"] = naming;
+  for (const [check, ok] of Object.entries(naming)) {
+    if (!ok) report.problems.push(`dialog [field editor: Name this field] ${check} failed`);
+  }
+  summary.movingNormally = (await page.evaluate(movingThings)).length;
+  await context.close();
+
+  const still = await open({ reducedMotion: "reduce" });
+  summary.stillMovingWithReduceMotion = await still.page.evaluate(movingThings);
+  await still.context.close();
+  for (const thing of summary.stillMovingWithReduceMotion) {
+    report.problems.push(`field editor still moves with "reduce motion": ${thing}`);
+  }
+  return summary;
+}
+
 // Contrast and control names on every screen and dialog, including the
 // ones not restyled yet: the colour tokens are shared, so a change to them
 // reaches all of them.
@@ -546,6 +619,7 @@ const SCREENS = {
   "fill-in screen": fillInScreen,
   "home screen": homeScreen,
   "new-template screen": newTemplateScreen,
+  "field editor": fieldEditorScreen,
   "every screen (contrast and names)": everyScreen,
 };
 
