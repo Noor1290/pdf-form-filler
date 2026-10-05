@@ -1,0 +1,885 @@
+{
+  "jsonPreview": [
+    "text: 2 columns had no matching field and were ignored: ID, BRN.",
+    "text: 3 people found in this file.",
+    "text: 43250.75",
+    "text: 50,000.00",
+    "text: 52,000",
+    "text: 6,650.00",
+    "text: 61250.50",
+    "text: 7000",
+    "text: Alpha",
+    "text: Basic Salary",
+    "text: Beta Gamma",
+    "text: Cancel",
+    "text: Close",
+    "text: Company Name",
+    "text: Delta",
+    "text: Fakeco Test Ltd",
+    "text: From \"payroll-fake.json\"",
+    "text: Import 3 people",
+    "text: Import entries",
+    "text: Net Pay",
+    "text: Other Names",
+    "text: Placeholder",
+    "text: Sampleton",
+    "text: Surname",
+    "text: Testperson"
+  ],
+  "peopleAfterJsonImport": 3,
+  "formShowsLastImportedPerson": {
+    "Company Name": "Fakeco Test Ltd",
+    "TAN": "",
+    "Surname": "Placeholder",
+    "Other Names": "Delta",
+    "Basic Salary": "7000",
+    "Net Pay": "6,650.00"
+  },
+  "csvPreviewAddTo": [
+    "text: 11000",
+    "text: 12,345.00",
+    "text: 2 columns had no matching field and were ignored: id, Department.",
+    "text: 2 people found in this file.",
+    "text: 8100.50",
+    "text: 9000",
+    "text: Add to",
+    "text: Add to the 3 people already added",
+    "text: Basic Salary",
+    "text: Cancel",
+    "text: Close",
+    "text: Csvperson",
+    "text: Eta, Theta",
+    "text: From \"payroll-fake.csv\"",
+    "text: Import 2 people",
+    "text: Import entries",
+    "text: Iota",
+    "text: Net Pay",
+    "text: Other Names",
+    "text: Rowley",
+    "text: Surname"
+  ],
+  "csvPreviewReplace": [
+    "text: 11000",
+    "text: 12,345.00",
+    "text: 2 columns had no matching field and were ignored: id, Department.",
+    "text: 2 people found in this file.",
+    "text: 8100.50",
+    "text: 9000",
+    "text: Basic Salary",
+    "text: Cancel",
+    "text: Close",
+    "text: Csvperson",
+    "text: Eta, Theta",
+    "text: From \"payroll-fake.csv\"",
+    "text: Import 2 people",
+    "text: Import entries",
+    "text: Iota",
+    "text: Net Pay",
+    "text: Other Names",
+    "text: Replace",
+    "text: Replace the 3 people already added",
+    "text: Rowley",
+    "text: Surname"
+  ],
+  "replaceConfirmation": [
+    "text: Cancel",
+    "text: Close",
+    "text: Replace all",
+    "text: Replace existing people?",
+    "text: This will remove the 3 people already added and replace them with the 2 from this file. This can't be undone."
+  ],
+  "peopleWhileConfirmationIsOpen": 0,
+  "peopleAfterReplace": 2,
+  "peopleAfterAddTo": 4,
+  "brokenJson": [
+    "text: Cancel",
+    "text: Close",
+    "text: From \"broken.json\"",
+    "text: Import entries",
+    "text: This file doesn't look like a valid JSON file."
+  ],
+  "jsonThatIsNotAList": [
+    "text: Cancel",
+    "text: Close",
+    "text: From \"not-a-list.json\"",
+    "text: Import entries",
+    "text: This JSON file should contain a list of entries, one per person."
+  ],
+  "noMatchingColumns": [
+    "text: 1 person found in this file.",
+    "text: 2 columns had no matching field and were ignored: Department, Email.",
+    "text: Add to",
+    "text: Add to the 4 people already added",
+    "text: Cancel",
+    "text: Close",
+    "text: From \"no-match.csv\"",
+    "text: Import 1 person",
+    "text: Import entries",
+    "text: None of the columns in this file match a field in this template, so there's nothing to import."
+  ],
+  "peopleAfterUnusableFiles": 4,
+  "download": {
+    "fileName": "Fake_Form.pdf",
+    "handedToWriter": [
+      {
+        "page": 1,
+        "text": "Csvperson",
+        "x": 150,
+        "y": 678.16,
+        "size": 12,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "Eta, Theta",
+        "x": 150,
+        "y": 648.48,
+        "size": 11,
+        "font": "Times-Roman",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "12,345.00",
+        "x": 216,
+        "y": 589.8,
+        "size": 10,
+        "font": "Courier",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
+        "text": "11000",
+        "x": 343.32,
+        "y": 589.16,
+        "size": 12,
+        "font": "Helvetica-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0.10196078431372549,
+          "green": 0.23529411764705882,
+          "blue": 0.5607843137254902
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "Rowley",
+        "x": 150,
+        "y": 678.16,
+        "size": 12,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "Iota",
+        "x": 150,
+        "y": 648.48,
+        "size": 11,
+        "font": "Times-Roman",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "9000",
+        "x": 246,
+        "y": 589.8,
+        "size": 10,
+        "font": "Courier",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
+        "text": "8100.50",
+        "x": 338.32,
+        "y": 589.16,
+        "size": 12,
+        "font": "Helvetica-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0.10196078431372549,
+          "green": 0.23529411764705882,
+          "blue": 0.5607843137254902
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 3,
+        "text": "Otherfake Holdings Ltd",
+        "x": 150,
+        "y": 740.12,
+        "size": 9,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 3,
+        "text": "Mockwell",
+        "x": 150,
+        "y": 678.16,
+        "size": 12,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 3,
+        "text": "Epsilon",
+        "x": 150,
+        "y": 648.48,
+        "size": 11,
+        "font": "Times-Roman",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 3,
+        "text": "30,500.00",
+        "x": 216,
+        "y": 589.8,
+        "size": 10,
+        "font": "Courier",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 3,
+        "text": "27000",
+        "x": 343.32,
+        "y": 589.16,
+        "size": 12,
+        "font": "Helvetica-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0.10196078431372549,
+          "green": 0.23529411764705882,
+          "blue": 0.5607843137254902
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 4,
+        "text": "Otherfake Holdings Ltd",
+        "x": 150,
+        "y": 740.12,
+        "size": 9,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 4,
+        "text": "Dummyford",
+        "x": 150,
+        "y": 678.16,
+        "size": 12,
+        "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 4,
+        "text": "Zeta",
+        "x": 150,
+        "y": 648.48,
+        "size": 11,
+        "font": "Times-Roman",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 4,
+        "text": "45000",
+        "x": 240,
+        "y": 589.8,
+        "size": 10,
+        "font": "Courier",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 4,
+        "text": "39,875.25",
+        "x": 333.31,
+        "y": 589.16,
+        "size": 12,
+        "font": "Helvetica-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0.10196078431372549,
+          "green": 0.23529411764705882,
+          "blue": 0.5607843137254902
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      }
+    ],
+    "readBack": [
+      {
+        "page": 1,
+        "rotation": 0,
+        "width": 595,
+        "height": 842,
+        "items": [
+          {
+            "text": "SAMPLE FORM - TEST DATA ONLY",
+            "x": 50,
+            "y": 800,
+            "size": 14,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employer:",
+            "x": 50,
+            "y": 745,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employee:",
+            "x": 50,
+            "y": 680,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Amounts:",
+            "x": 50,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Csvperson",
+            "x": 150,
+            "y": 678,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Eta, Theta",
+            "x": 150,
+            "y": 648.5,
+            "size": 11,
+            "angle": 0,
+            "font": "Times-Roman"
+          },
+          {
+            "text": "12,345.00",
+            "x": 216,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier"
+          },
+          {
+            "text": "11000",
+            "x": 343.5,
+            "y": 589,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica-Bold"
+          }
+        ]
+      },
+      {
+        "page": 2,
+        "rotation": 0,
+        "width": 595,
+        "height": 842,
+        "items": [
+          {
+            "text": "SAMPLE FORM - TEST DATA ONLY",
+            "x": 50,
+            "y": 800,
+            "size": 14,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employer:",
+            "x": 50,
+            "y": 745,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employee:",
+            "x": 50,
+            "y": 680,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Amounts:",
+            "x": 50,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Rowley",
+            "x": 150,
+            "y": 678,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Iota",
+            "x": 150,
+            "y": 648.5,
+            "size": 11,
+            "angle": 0,
+            "font": "Times-Roman"
+          },
+          {
+            "text": "9000",
+            "x": 246,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier"
+          },
+          {
+            "text": "8100.50",
+            "x": 338.5,
+            "y": 589,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica-Bold"
+          }
+        ]
+      },
+      {
+        "page": 3,
+        "rotation": 0,
+        "width": 595,
+        "height": 842,
+        "items": [
+          {
+            "text": "SAMPLE FORM - TEST DATA ONLY",
+            "x": 50,
+            "y": 800,
+            "size": 14,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employer:",
+            "x": 50,
+            "y": 745,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employee:",
+            "x": 50,
+            "y": 680,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Amounts:",
+            "x": 50,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Otherfake Holdings Ltd",
+            "x": 150,
+            "y": 740,
+            "size": 9,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Mockwell",
+            "x": 150,
+            "y": 678,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Epsilon",
+            "x": 150,
+            "y": 648.5,
+            "size": 11,
+            "angle": 0,
+            "font": "Times-Roman"
+          },
+          {
+            "text": "30,500.00",
+            "x": 216,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier"
+          },
+          {
+            "text": "27000",
+            "x": 343.5,
+            "y": 589,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica-Bold"
+          }
+        ]
+      },
+      {
+        "page": 4,
+        "rotation": 0,
+        "width": 595,
+        "height": 842,
+        "items": [
+          {
+            "text": "SAMPLE FORM - TEST DATA ONLY",
+            "x": 50,
+            "y": 800,
+            "size": 14,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employer:",
+            "x": 50,
+            "y": 745,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Employee:",
+            "x": 50,
+            "y": 680,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Amounts:",
+            "x": 50,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Otherfake Holdings Ltd",
+            "x": 150,
+            "y": 740,
+            "size": 9,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Dummyford",
+            "x": 150,
+            "y": 678,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica"
+          },
+          {
+            "text": "Zeta",
+            "x": 150,
+            "y": 648.5,
+            "size": 11,
+            "angle": 0,
+            "font": "Times-Roman"
+          },
+          {
+            "text": "45000",
+            "x": 240,
+            "y": 590,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier"
+          },
+          {
+            "text": "39,875.25",
+            "x": 333.5,
+            "y": 589,
+            "size": 12,
+            "angle": 0,
+            "font": "Helvetica-Bold"
+          }
+        ]
+      }
+    ]
+  },
+  "stored": [
+    {
+      "name": "Fake Form",
+      "pdfFileName": "fake-form.pdf",
+      "pdfStoredUnchanged": "not checked",
+      "fields": [
+        {
+          "name": "Company Name",
+          "page": 1,
+          "fontSize": 9,
+          "fontFamily": "Helvetica",
+          "bold": false,
+          "align": "left",
+          "color": "#000000",
+          "validationType": "text",
+          "x": 150,
+          "y": 90,
+          "width": 300,
+          "height": 18
+        },
+        {
+          "name": "TAN",
+          "page": 1,
+          "fontSize": 10,
+          "fontFamily": "Courier",
+          "bold": true,
+          "align": "left",
+          "color": "#000000",
+          "validationType": "text",
+          "x": 150,
+          "y": 115,
+          "width": 150,
+          "height": 18
+        },
+        {
+          "name": "Surname",
+          "page": 1,
+          "fontSize": 12,
+          "fontFamily": "Helvetica",
+          "bold": false,
+          "align": "left",
+          "color": "#000000",
+          "validationType": "text",
+          "x": 150,
+          "y": 150,
+          "width": 200,
+          "height": 20
+        },
+        {
+          "name": "Other Names",
+          "page": 1,
+          "fontSize": 11,
+          "fontFamily": "Times-Roman",
+          "bold": false,
+          "align": "left",
+          "color": "#000000",
+          "validationType": "text",
+          "x": 150,
+          "y": 180,
+          "width": 200,
+          "height": 20
+        },
+        {
+          "name": "Basic Salary",
+          "page": 1,
+          "fontSize": 10,
+          "fontFamily": "Courier",
+          "bold": false,
+          "align": "right",
+          "color": "#000000",
+          "validationType": "amount",
+          "x": 150,
+          "y": 240,
+          "width": 120,
+          "height": 18
+        },
+        {
+          "name": "Net Pay",
+          "page": 1,
+          "fontSize": 12,
+          "fontFamily": "Helvetica",
+          "bold": true,
+          "align": "center",
+          "color": "#1a3c8f",
+          "validationType": "amount",
+          "x": 300,
+          "y": 240,
+          "width": 120,
+          "height": 18
+        }
+      ],
+      "formValues": {
+        "Basic Salary": "45000",
+        "Company Name": "Otherfake Holdings Ltd",
+        "Net Pay": "39,875.25",
+        "Other Names": "Zeta",
+        "Surname": "Dummyford"
+      },
+      "people": [
+        {
+          "Basic Salary": "12,345.00",
+          "Net Pay": "11000",
+          "Other Names": "Eta, Theta",
+          "Surname": "Csvperson"
+        },
+        {
+          "Basic Salary": "9000",
+          "Net Pay": "8100.50",
+          "Other Names": "Iota",
+          "Surname": "Rowley"
+        },
+        {
+          "Basic Salary": "30,500.00",
+          "Company Name": "Otherfake Holdings Ltd",
+          "Net Pay": "27000",
+          "Other Names": "Epsilon",
+          "Surname": "Mockwell"
+        },
+        {
+          "Basic Salary": "45000",
+          "Company Name": "Otherfake Holdings Ltd",
+          "Net Pay": "39,875.25",
+          "Other Names": "Zeta",
+          "Surname": "Dummyford"
+        }
+      ],
+      "companyDetails": "not set"
+    }
+  ]
+}

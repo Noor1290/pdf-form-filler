@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { TriangleAlertIcon } from "lucide-react";
+import {
+  CircleAlertIcon,
+  ReplaceIcon,
+  TriangleAlertIcon,
+  UploadIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,6 +35,13 @@ type ImportPreviewDialogProps = {
 };
 
 const PREVIEW_ROW_COUNT = 3;
+
+// Only decides how a preview cell is displayed (right-aligned, in the
+// number font). The value itself is shown exactly as it was typed or
+// imported: nothing is ever parsed or reformatted.
+function looksLikeANumber(value: string | undefined): boolean {
+  return /^-?\d[\d,]*(\.\d+)?$/.test((value ?? "").trim());
+}
 
 // What is about to be imported, and the Add to / Replace choice — the one
 // confirmation step every import goes through, whether the rows came from
@@ -83,12 +95,19 @@ export function ImportPreviewDialog({
   const previewBoxIds = parsed
     ? Array.from(new Set(parsed.entries.flatMap((entry) => Object.keys(entry))))
     : [];
+  const previewRows = parsed?.entries.slice(0, PREVIEW_ROW_COUNT) ?? [];
+  const numberColumns = new Set(
+    previewBoxIds.filter((boxId) => {
+      const cells = previewRows.map((row) => row[boxId]).filter(Boolean);
+      return cells.length > 0 && cells.every(looksLikeANumber);
+    }),
+  );
 
   return (
     <>
       <Dialog open={preview !== null} onOpenChange={(open) => !open && close()}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader icon={<UploadIcon />}>
             <DialogTitle>Import entries</DialogTitle>
             <DialogDescription>
               {(preview ?? shown)?.description}
@@ -96,29 +115,29 @@ export function ImportPreviewDialog({
           </DialogHeader>
 
           {preview?.error && (
-            <p className="text-sm text-destructive">{preview.error}</p>
+            <p className="notice-panel notice-danger">
+              <CircleAlertIcon />
+              {preview.error}
+            </p>
           )}
 
           {parsed && (
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-foreground">
+            <div className="flex min-w-0 flex-col gap-3">
+              <p className="text-sm text-fg">
                 {parsed.entries.length}{" "}
                 {parsed.entries.length === 1 ? "person" : "people"} found in
                 this {source}.
               </p>
 
               {preview?.warnings.map((warning) => (
-                <p
-                  key={warning}
-                  className="flex items-start gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 p-2.5 text-sm text-foreground"
-                >
-                  <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                <p key={warning} className="notice-panel notice-warn">
+                  <TriangleAlertIcon />
                   {warning}
                 </p>
               ))}
 
               {parsed.unmatchedColumns.length > 0 && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted">
                   {parsed.unmatchedColumns.length}{" "}
                   {parsed.unmatchedColumns.length === 1
                     ? "column had"
@@ -130,29 +149,45 @@ export function ImportPreviewDialog({
               )}
 
               {!canImport && (
-                <p className="text-sm text-destructive">
+                <p className="notice-panel notice-danger">
+                  <CircleAlertIcon />
                   None of the columns in this {source} match a field in this
                   template, so there's nothing to import.
                 </p>
               )}
 
+              {/* The table scrolls inside its own box, under a header that
+                  stays put; the dialog around it does not move. */}
               {canImport && (
-                <div className="overflow-x-auto rounded-lg border border-border">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-muted">
+                <div className="max-h-64 overflow-auto rounded-lg border border-line">
+                  <table className="w-full text-left text-sm">
+                    <thead className="sticky top-0 bg-elevated">
                       <tr>
                         {previewBoxIds.map((boxId) => (
-                          <th key={boxId} className="px-2.5 py-1.5 font-medium">
+                          <th
+                            key={boxId}
+                            className={`border-b border-line px-3 py-2 text-xs font-medium whitespace-nowrap text-muted ${
+                              numberColumns.has(boxId) ? "text-right" : ""
+                            }`}
+                          >
                             {boxNameById.get(boxId) ?? boxId}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {parsed.entries.slice(0, PREVIEW_ROW_COUNT).map((entry, index) => (
-                        <tr key={index} className="border-t border-border">
+                      {previewRows.map((entry, index) => (
+                        <tr
+                          key={index}
+                          className="border-b border-line transition-colors duration-150 last:border-b-0 hover:bg-surface-hover"
+                        >
                           {previewBoxIds.map((boxId) => (
-                            <td key={boxId} className="px-2.5 py-1.5 text-muted-foreground">
+                            <td
+                              key={boxId}
+                              className={`px-3 py-2 whitespace-nowrap text-fg ${
+                                numberColumns.has(boxId) ? "num text-right" : ""
+                              }`}
+                            >
                               {entry[boxId] || "—"}
                             </td>
                           ))}
@@ -161,7 +196,7 @@ export function ImportPreviewDialog({
                     </tbody>
                   </table>
                   {parsed.entries.length > PREVIEW_ROW_COUNT && (
-                    <p className="border-t border-border px-2.5 py-1.5 text-xs text-muted-foreground">
+                    <p className="border-t border-line px-3 py-2 text-xs text-muted">
                       + {parsed.entries.length - PREVIEW_ROW_COUNT} more
                     </p>
                   )}
@@ -169,8 +204,8 @@ export function ImportPreviewDialog({
               )}
 
               {existingEntryCount > 0 && (
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-2.5">
-                  <span className="text-sm">
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface p-3">
+                  <span className="text-sm text-fg">
                     {replaceMode
                       ? `Replace the ${existingEntryCount} ${existingEntryCount === 1 ? "person" : "people"} already added`
                       : `Add to the ${existingEntryCount} ${existingEntryCount === 1 ? "person" : "people"} already added`}
@@ -207,7 +242,7 @@ export function ImportPreviewDialog({
         onOpenChange={(open) => !open && setConfirmingReplace(false)}
       >
         <DialogContent>
-          <DialogHeader>
+          <DialogHeader icon={<ReplaceIcon />} tone="danger">
             <DialogTitle>Replace existing people?</DialogTitle>
             <DialogDescription>
               This will remove the {existingEntryCount}{" "}

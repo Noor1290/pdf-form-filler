@@ -29,7 +29,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 isolate z-50 bg-black/60 backdrop-blur-sm transition-none duration-150 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
@@ -51,7 +51,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-2xl border border-line-strong bg-elevated p-5 text-sm text-fg shadow-[var(--shadow-pop)] transition-none duration-150 sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
@@ -63,7 +63,7 @@ function DialogContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-2 right-2"
+                className="absolute top-3 right-3"
                 size="icon-sm"
               />
             }
@@ -78,13 +78,46 @@ function DialogContent({
   )
 }
 
-function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
+const HEADER_ICON_TONE = {
+  accent: "text-accent",
+  warn: "text-warn",
+  danger: "text-danger",
+}
+
+// A dialog header is a round tinted icon, then the title and its one-line
+// description. The icon is decoration: the title already says what the
+// dialog is for, so it is hidden from screen readers.
+function DialogHeader({
+  className,
+  icon,
+  tone = "accent",
+  children,
+  ...props
+}: React.ComponentProps<"div"> & {
+  icon?: React.ReactNode
+  tone?: keyof typeof HEADER_ICON_TONE
+}) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2", className)}
+      className={cn("flex items-start gap-3 pr-8", className)}
       {...props}
-    />
+    >
+      {icon && (
+        <div
+          aria-hidden="true"
+          className={cn(
+            "icon-tile icon-tile-round [&_svg]:size-5",
+            HEADER_ICON_TONE[tone]
+          )}
+        >
+          {icon}
+        </div>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 self-center">
+        {children}
+      </div>
+    </div>
   )
 }
 
@@ -100,7 +133,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        "flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end",
         className
       )}
       {...props}
@@ -120,7 +153,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
     <DialogPrimitive.Title
       data-slot="dialog-title"
       className={cn(
-        "font-heading text-base leading-none font-medium",
+        "text-base leading-snug font-semibold text-fg",
         className
       )}
       {...props}
@@ -136,7 +169,7 @@ function DialogDescription({
     <DialogPrimitive.Description
       data-slot="dialog-description"
       className={cn(
-        "text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
+        "text-sm text-muted *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-fg",
         className
       )}
       {...props}

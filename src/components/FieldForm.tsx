@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  CircleAlertIcon,
+  DownloadIcon,
+  EraserIcon,
   FileTextIcon,
   LockIcon,
   Trash2Icon,
+  TriangleAlertIcon,
   UnlockIcon,
+  UserMinusIcon,
+  UserPlusIcon,
   UsersIcon,
 } from "lucide-react";
 import { Rnd } from "react-rnd";
@@ -436,22 +442,21 @@ export function FieldForm({
   }
 
   return (
-    <div className="flex w-full max-w-5xl flex-col gap-4">
-      <div className="flex w-full flex-wrap items-center justify-between gap-3">
-        <h2 className="text-2xl font-semibold tracking-tight">
+    <div className="flex w-full max-w-296 flex-col gap-5">
+      <div className="flex w-full animate-rise flex-wrap items-center justify-between gap-3">
+        <h2 className="text-2xl font-semibold tracking-tight text-fg">
           {template.name}
         </h2>
         <div className="flex flex-wrap items-center gap-2">
           {boxes.length > 0 && (
             <Button onClick={handleDownload} disabled={exporting}>
+              <DownloadIcon />
               {exporting ? "Preparing PDF…" : "Download PDF"}
             </Button>
           )}
           {positionsDirty && (
             <>
-              <span className="text-sm text-muted-foreground">
-                Unsaved changes
-              </span>
+              <span className="badge text-warn">Unsaved changes</span>
               <Button variant="outline" onClick={handleResetToTemplate}>
                 Reset to template
               </Button>
@@ -492,29 +497,44 @@ export function FieldForm({
       </div>
 
       {boxes.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
-          <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-            <FileTextIcon className="size-6 text-muted-foreground" />
+        <div className="glass flex animate-rise flex-col items-center gap-4 p-12 text-center">
+          <div className="icon-tile">
+            <FileTextIcon className="size-5" />
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-muted">
             This template doesn't have any fields yet.
           </p>
           <Button onClick={onEditFields}>Add fields</Button>
         </div>
       ) : (
-        <div className="flex w-full items-start gap-6">
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex w-full flex-col items-start gap-5 xl:flex-row xl:justify-between">
+          {/* The preview keeps its true size at every window width and
+              scrolls sideways inside this frame when the window is narrower
+              than the page. Nothing here blurs, tints or overlays the page. */}
+          <div className="preview-frame max-w-full overflow-x-auto p-4">
             <div
-              className="relative shrink-0 select-none"
+              className={
+                canvasSize || error
+                  ? "on-paper relative shrink-0 select-none"
+                  : "on-paper relative h-140 w-200 shrink-0 select-none"
+              }
               style={
                 canvasSize
                   ? { width: canvasSize.width, height: canvasSize.height }
                   : undefined
               }
             >
+              {/* Shown only until the page has been drawn, in its place. */}
+              {!canvasSize && !error && (
+                <div aria-hidden="true" className="skeleton absolute inset-0" />
+              )}
               <canvas
                 ref={pdfCanvasRef}
-                className="rounded-lg border border-border"
+                className={
+                  canvasSize
+                    ? "rounded-lg border border-line"
+                    : "invisible rounded-lg border border-line"
+                }
               />
               <canvas
                 ref={textCanvasRef}
@@ -531,7 +551,7 @@ export function FieldForm({
                   return (
                     <div
                       key={box.id}
-                      className="absolute cursor-pointer border border-dashed border-muted-foreground/50 hover:border-primary"
+                      className="absolute cursor-pointer border border-dashed border-accent/70 transition-colors duration-150 hover:border-solid hover:border-accent"
                       style={{
                         left: pixelRect.x,
                         top: pixelRect.y,
@@ -571,13 +591,13 @@ export function FieldForm({
                       })
                     }
                     resizeHandleStyles={resizeHandleStyles}
-                    className="border-2 border-primary bg-primary/10 hover:bg-primary/20"
+                    className="border-2 border-accent"
                   >
                     <div
                       className="h-full w-full cursor-pointer"
                       onClick={() => setEditingBoxId(box.id)}
                     >
-                      <span className="pointer-events-none absolute -top-6 left-0 rounded bg-primary px-1.5 py-0.5 text-xs whitespace-nowrap text-primary-foreground">
+                      <span className="pointer-events-none absolute -top-6 left-0 rounded bg-accent px-1.5 py-0.5 text-xs whitespace-nowrap text-accent-fg">
                         {box.name}
                       </span>
                     </div>
@@ -587,8 +607,14 @@ export function FieldForm({
             </div>
           </div>
 
-          <div className="flex w-72 shrink-0 flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-foreground">Fields</h3>
+          {/* Beside the preview on a wide window, underneath it on a narrow
+              one (side by side there if they fit). */}
+          <div className="grid w-full shrink-0 animate-rise items-start gap-5 sm:grid-cols-2 xl:w-80 xl:grid-cols-1">
+          <section className="glass min-w-0">
+            <div className="card-header">
+              <h3 className="card-title">Fields</h3>
+            </div>
+            <div className="flex flex-col gap-4 p-4">
             {/* Fields follow their position on the page — top-to-bottom,
                 then left-to-right — not the order they were drawn in. */}
             {orderedBoxes.map((box) => {
@@ -597,10 +623,10 @@ export function FieldForm({
                 values[box.id] ?? "",
               );
               return (
-                <div key={box.id} className="flex flex-col gap-1">
+                <div key={box.id} className="flex flex-col gap-1.5">
                   <label
                     htmlFor={`field-${box.id}`}
-                    className="text-sm font-medium"
+                    className="text-sm font-medium text-fg"
                   >
                     {box.name}
                   </label>
@@ -610,20 +636,25 @@ export function FieldForm({
                     onChange={(event) =>
                       handleChange(box.id, event.target.value)
                     }
+                    className={
+                      box.validationType === "amount" ? "num" : undefined
+                    }
                   />
                   {warning && (
-                    <p className="text-xs text-amber-600 dark:text-amber-500">
+                    <p className="flex items-center gap-1.5 text-xs text-warn">
+                      <TriangleAlertIcon className="size-3.5 shrink-0" />
                       {warning}
                     </p>
                   )}
                 </div>
               );
             })}
-          </div>
+            </div>
+          </section>
 
-          <div className="flex w-56 shrink-0 flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground">
+          <section className="glass min-w-0">
+            <div className="card-header">
+              <h3 className="card-title">
                 People
               </h3>
               {entries.length > 0 && (
@@ -636,7 +667,9 @@ export function FieldForm({
                 </Button>
               )}
             </div>
+            <div className="flex flex-col gap-3 p-4">
             <Button variant="outline" onClick={handleAddAndFillNext}>
+              <UserPlusIcon />
               Add &amp; fill next person
             </Button>
             <ImportEntriesDialog
@@ -650,9 +683,11 @@ export function FieldForm({
             />
 
             {entries.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border p-4 text-center">
-                <UsersIcon className="size-5 text-muted-foreground" />
-                <p className="text-xs text-muted-foreground">
+              <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-4 text-center">
+                <div className="icon-tile">
+                  <UsersIcon className="size-5" />
+                </div>
+                <p className="text-xs text-muted">
                   Filling in just one person? Download PDF works right away —
                   this list is only for several people at once.
                 </p>
@@ -662,16 +697,21 @@ export function FieldForm({
                 {entries.map((entry, index) => (
                   <li key={entry.id}>
                     <div
-                      className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 transition-colors ${
+                      className={`flex items-center justify-between gap-2 rounded-lg border py-1 pr-1 pl-3 transition-colors duration-150 ${
                         entry.id === activeEntryId
-                          ? "border-primary bg-primary/10"
-                          : "border-border"
+                          ? "border-accent bg-accent/10 shadow-[inset_3px_0_0_0_var(--accent)]"
+                          : "border-line hover:bg-surface-hover"
                       }`}
                     >
                       <button
                         type="button"
                         onClick={() => handleSelectEntry(entry.id)}
-                        className="flex-1 truncate text-left text-sm"
+                        aria-current={
+                          entry.id === activeEntryId ? "true" : undefined
+                        }
+                        className={`flex-1 truncate rounded py-1.5 text-left text-sm text-fg ${
+                          entry.id === activeEntryId ? "font-semibold" : ""
+                        }`}
                       >
                         Person {index + 1}
                       </button>
@@ -681,18 +721,25 @@ export function FieldForm({
                         aria-label={`Delete Person ${index + 1}`}
                         onClick={() => setDeletingEntryId(entry.id)}
                       >
-                        <Trash2Icon className="text-destructive" />
+                        <Trash2Icon className="text-danger" />
                       </Button>
                     </div>
                   </li>
                 ))}
               </ul>
             )}
+            </div>
+          </section>
           </div>
         </div>
       )}
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p className="notice-panel notice-danger">
+          <CircleAlertIcon />
+          {error}
+        </p>
+      )}
 
       <BoxStyleDialog
         box={boxes.find((box) => box.id === editingBoxId) ?? null}
@@ -705,7 +752,7 @@ export function FieldForm({
         onOpenChange={(open) => !open && setConfirmingClear(false)}
       >
         <DialogContent>
-          <DialogHeader>
+          <DialogHeader icon={<EraserIcon />} tone="danger">
             <DialogTitle>Clear all values?</DialogTitle>
             <DialogDescription>
               This will erase everything typed into this template's fields.
@@ -731,7 +778,7 @@ export function FieldForm({
         onOpenChange={(open) => !open && setDeletingEntryId(null)}
       >
         <DialogContent>
-          <DialogHeader>
+          <DialogHeader icon={<UserMinusIcon />} tone="danger">
             <DialogTitle>Remove this person?</DialogTitle>
             <DialogDescription>
               This will remove "Person{" "}
@@ -758,7 +805,7 @@ export function FieldForm({
         onOpenChange={(open) => !open && setConfirmingClearEntries(false)}
       >
         <DialogContent>
-          <DialogHeader>
+          <DialogHeader icon={<UsersIcon />} tone="danger">
             <DialogTitle>Clear all people?</DialogTitle>
             <DialogDescription>
               This will remove everyone added to this batch ({entries.length}{" "}

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { UploadIcon } from "lucide-react";
+import { CircleAlertIcon, UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PdfCanvas } from "@/components/PdfCanvas";
@@ -64,9 +64,11 @@ export function NewTemplateFlow({
   }
 
   return (
-    <div className="flex w-full max-w-2xl flex-col items-center gap-6">
-      <div className="flex w-full items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight">
+    <div
+      className={`flex w-full flex-col gap-5 ${file ? "max-w-296" : "max-w-4xl"}`}
+    >
+      <div className="flex w-full animate-rise flex-wrap items-center justify-between gap-3">
+        <h2 className="text-2xl font-semibold tracking-tight text-fg">
           New template
         </h2>
         <Button variant="outline" onClick={onCancel}>
@@ -74,18 +76,28 @@ export function NewTemplateFlow({
         </Button>
       </div>
 
+      {/* Directly under the title, so it is seen at once at any window
+          width, not below a tall preview. */}
+      {error && (
+        <p className="notice-panel notice-danger w-full">
+          <CircleAlertIcon />
+          {error}
+        </p>
+      )}
+
       {!file ? (
-        <div className="flex w-full flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
-          <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-            <UploadIcon className="size-6 text-muted-foreground" />
+        <div className="glass flex w-full animate-rise flex-col items-center gap-4 px-6 py-14 text-center">
+          <div className="icon-tile">
+            <UploadIcon className="size-5" />
           </div>
           <div className="flex flex-col gap-1">
-            <p className="font-medium text-foreground">Upload a blank PDF</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base font-semibold text-fg">Upload a blank PDF</p>
+            <p className="text-sm text-muted">
               You'll draw fields on it in the next step.
             </p>
           </div>
           <Button className="mt-1" onClick={() => fileInputRef.current?.click()}>
+            <UploadIcon />
             Upload a PDF
           </Button>
           <input
@@ -97,28 +109,34 @@ export function NewTemplateFlow({
           />
         </div>
       ) : (
-        <div className="flex w-full flex-col items-center gap-4 rounded-xl border border-border bg-card p-6 shadow-sm">
-          <div className="flex w-full max-w-sm flex-col gap-1">
-            <label htmlFor="template-name" className="text-sm font-medium">
-              Template name
-            </label>
-            <Input
-              id="template-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="e.g. Statement of Emoluments 2026"
-            />
+        // The name and Save button sit beside the preview on a wide window,
+        // and above it on a narrow one (so they are not below a tall page).
+        <div className="flex w-full flex-col items-start gap-5 xl:flex-row-reverse xl:justify-between">
+          <section className="glass flex w-full shrink-0 animate-rise flex-col gap-4 p-4 xl:w-80">
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="template-name"
+                className="text-sm font-medium text-fg"
+              >
+                Template name
+              </label>
+              <Input
+                id="template-name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="e.g. Statement of Emoluments 2026"
+              />
+            </div>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving…" : "Save template"}
+            </Button>
+          </section>
+
+          <div className="preview-frame max-w-full p-4">
+            <PdfCanvas source={file} onError={setError} />
           </div>
-
-          <PdfCanvas source={file} onError={setError} />
-
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Save template"}
-          </Button>
         </div>
       )}
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

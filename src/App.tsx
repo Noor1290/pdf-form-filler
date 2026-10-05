@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { DownloadIcon, FileTextIcon } from "lucide-react";
+import { CircleAlertIcon, DownloadIcon, FileTextIcon } from "lucide-react";
 import { BoxEditor } from "@/components/BoxEditor";
 import { CompanyDetailsPanel } from "@/components/CompanyDetailsPanel";
 import { DashboardDataNotice } from "@/components/DashboardDataNotice";
 import { FieldForm } from "@/components/FieldForm";
 import { NewTemplateFlow } from "@/components/NewTemplateFlow";
 import { TemplateList } from "@/components/TemplateList";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { readDashboardPayroll, type DashboardPayroll } from "@/lib/payrollHub";
 import {
@@ -131,32 +132,45 @@ function App() {
       : "Check the preview to import it into this template.";
 
   return (
-    <div className="flex min-h-svh flex-col bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto flex max-w-6xl items-center gap-2.5 px-6 py-4">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+    <div className="relative isolate flex min-h-svh flex-col bg-canvas">
+      {/* Soft colour washes and a faint grid behind the content, for depth.
+          Only on screens with no PDF on them: wherever a document is
+          previewed, the background stays plain. */}
+      {(view.name === "home" || view.name === "company-details") && (
+        <div aria-hidden="true" className="app-backdrop">
+          <span />
+          <span />
+          <span />
+        </div>
+      )}
+      <header className="border-b border-line bg-elevated">
+        <div className="mx-auto flex max-w-296 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6">
+          <div className="icon-tile size-9 rounded-lg">
             <FileTextIcon className="size-4.5" />
           </div>
-          <h1 className="text-base font-semibold tracking-tight text-foreground">
+          <h1 className="text-base font-semibold tracking-tight text-fg">
             Statement of Emoluments Tool
           </h1>
-          {insideDashboard && (
+          <div className="ml-auto flex items-center gap-2">
+            {insideDashboard && (
             <Button
               variant="outline"
-              className="ml-auto"
               onClick={handleGetFromDashboard}
               disabled={requesting}
             >
               <DownloadIcon />
               {requesting ? "Waiting for the dashboard…" : "Get from dashboard"}
             </Button>
-          )}
+            )}
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col items-center gap-6 px-6 py-10">
+      <main className="flex flex-1 flex-col items-center gap-6 px-4 py-8 sm:px-6">
         {dashboardError && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="notice-panel notice-danger w-full max-w-2xl">
+            <CircleAlertIcon />
             {dashboardError}
           </p>
         )}
@@ -165,6 +179,7 @@ function App() {
           <DashboardDataNotice
             data={waitingPayroll}
             hint={waitingHint}
+            wide={view.name === "fill"}
             onReview={
               canPreviewHere && previewClosed
                 ? () => setPreviewClosed(false)

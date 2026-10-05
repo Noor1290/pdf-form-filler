@@ -9,6 +9,9 @@ import {
 type DashboardDataNoticeProps = {
   data: DashboardPayroll;
   hint: string;
+  // As wide as the screen it sits above: the fill-in screen is wide, the
+  // template list is narrower.
+  wide: boolean;
   // Only offered where the import preview can actually open (a template's
   // fill-in screen, after the preview was closed without importing).
   onReview?: () => void;
@@ -21,6 +24,7 @@ type DashboardDataNoticeProps = {
 export function DashboardDataNotice({
   data,
   hint,
+  wide,
   onReview,
   onDiscard,
 }: DashboardDataNoticeProps) {
@@ -33,17 +37,19 @@ export function DashboardDataNotice({
   return (
     <div
       role="status"
-      className="flex w-full max-w-2xl items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 p-3.5"
+      className={`glass flex w-full flex-wrap items-center gap-3 border-accent/40 p-4 ${
+        wide ? "max-w-296" : "max-w-4xl"
+      }`}
     >
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+      <div className="icon-tile">
         <InboxIcon className="size-5" />
       </div>
-      <div className="flex flex-1 flex-col">
-        <span className="font-medium text-foreground">
+      <div className="flex min-w-48 flex-1 flex-col gap-0.5">
+        <span className="font-semibold text-fg">
           Payroll data from the dashboard is waiting
         </span>
-        <span className="text-sm text-foreground">{details.join(" · ")}</span>
-        <span className="text-sm text-muted-foreground">{hint}</span>
+        <span className="text-sm text-fg">{details.join(" · ")}</span>
+        <span className="text-sm text-muted">{hint}</span>
       </div>
       <div className="flex shrink-0 gap-2">
         {onReview && (

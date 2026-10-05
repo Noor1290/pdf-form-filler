@@ -1,0 +1,12 @@
+{
+  "added": [
+    "aria-label: Switch to light theme",
+    "title: Switch to light theme",
+    "aria-label: Switch to dark theme",
+    "title: Switch to dark theme",
+    "aria-label: Name this field",
+    "aria-label: Rename field",
+    "aria-label: Rename template"
+  ],
+  "removed": []
+}

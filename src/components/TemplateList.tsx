@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { Building2Icon, FileStackIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import {
+  Building2Icon,
+  FileStackIcon,
+  PencilIcon,
+  PenLineIcon,
+  PlusIcon,
+  Trash2Icon,
+  UploadIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -54,35 +62,39 @@ export function TemplateList({
   }
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
+    <div className="flex w-full max-w-4xl animate-rise flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-3xl font-semibold tracking-tight text-fg">
             Your templates
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted">
             Pick a template to fill in, or create a new one.
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
           {templates.length > 0 && (
-            <Button onClick={onNewTemplate}>New Template</Button>
+            <Button onClick={onNewTemplate}>
+              <PlusIcon />
+              New Template
+            </Button>
           )}
         </div>
       </div>
 
       {templates.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
-          <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-            <FileStackIcon className="size-6 text-muted-foreground" />
+        <div className="glass flex flex-col items-center gap-4 px-6 py-14 text-center">
+          <div className="icon-tile">
+            <FileStackIcon className="size-5" />
           </div>
           <div className="flex flex-col gap-1">
-            <p className="font-medium text-foreground">No templates yet</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base font-semibold text-fg">No templates yet</p>
+            <p className="text-sm text-muted">
               Upload a PDF to create your first one.
             </p>
           </div>
           <Button className="mt-1" onClick={onNewTemplate}>
+            <UploadIcon />
             Upload a PDF
           </Button>
         </div>
@@ -91,30 +103,34 @@ export function TemplateList({
           {templates.map((template) => (
             <li
               key={template.id}
-              className="flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 shadow-sm transition-colors hover:border-primary/40"
+              className="glass flex flex-wrap items-center gap-x-4 gap-y-3 p-4 transition-[transform,border-color] duration-150 hover:-translate-y-0.5 hover:border-line-strong"
             >
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                <FileStackIcon className="size-5" />
-              </div>
+              {/* The whole left side opens the template to fill in. */}
               <button
                 type="button"
                 onClick={() => onFillTemplate(template.id)}
-                className="flex flex-1 flex-col items-start text-left"
+                className="flex min-w-56 flex-1 items-center gap-4 rounded-lg text-left"
               >
-                <span className="font-medium text-foreground">
+                <span className="icon-tile">
+                  <FileStackIcon className="size-5" />
+                </span>
+                <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="truncate font-semibold text-fg">
                   {template.name}
                 </span>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted tabular-nums">
                   Last updated{" "}
                   {new Date(template.updatedAt).toLocaleDateString()}
                 </span>
+                </span>
               </button>
-              <div className="flex shrink-0 gap-2">
+              <div className="flex max-w-full flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => onEditTemplate(template.id)}
                 >
+                  <PenLineIcon />
                   Edit fields
                 </Button>
                 <Button
@@ -149,16 +165,16 @@ export function TemplateList({
         onOpenChange={(open) => !open && setRenaming(null)}
       >
         <DialogContent>
-          <DialogHeader>
+          <DialogHeader icon={<PencilIcon />}>
             <DialogTitle>Rename template</DialogTitle>
             <DialogDescription>
               Choose a new name for "{renaming?.name}".
             </DialogDescription>
           </DialogHeader>
           <Input
+            aria-label="Rename template"
             value={renameValue}
             onChange={(event) => setRenameValue(event.target.value)}
-            autoFocus
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setRenaming(null)}>
@@ -174,7 +190,7 @@ export function TemplateList({
         onOpenChange={(open) => !open && setDeleting(null)}
       >
         <DialogContent>
-          <DialogHeader>
+          <DialogHeader icon={<Trash2Icon />} tone="danger">
             <DialogTitle>Delete template?</DialogTitle>
             <DialogDescription>
               This will permanently delete "{deleting?.name}" and all its

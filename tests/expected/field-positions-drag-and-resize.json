@@ -1,0 +1,362 @@
+{
+  "upright page": {
+    "pageShownAt": "800 x 1132",
+    "afterDrawing": [
+      {
+        "name": "Surname",
+        "page": 1,
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "bold": false,
+        "align": "left",
+        "color": "#000000",
+        "validationType": "text",
+        "x": 74.38,
+        "y": 111.56,
+        "width": 178.5,
+        "height": 20.83
+      }
+    ],
+    "afterMoving": [
+      {
+        "name": "Surname",
+        "page": 1,
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "bold": false,
+        "align": "left",
+        "color": "#000000",
+        "validationType": "text",
+        "x": 119,
+        "y": 141.31,
+        "width": 178.5,
+        "height": 20.83
+      }
+    ],
+    "afterResizingFromBottomRight": [
+      {
+        "name": "Surname",
+        "page": 1,
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "bold": false,
+        "align": "left",
+        "color": "#000000",
+        "validationType": "text",
+        "x": 119,
+        "y": 141.31,
+        "width": 223.13,
+        "height": 35.7
+      }
+    ],
+    "afterResizingFromTopLeft": [
+      {
+        "name": "Surname",
+        "page": 1,
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "bold": false,
+        "align": "left",
+        "color": "#000000",
+        "validationType": "text",
+        "x": 96.69,
+        "y": 133.88,
+        "width": 245.44,
+        "height": 43.14
+      }
+    ],
+    "afterReload": [
+      {
+        "name": "Surname",
+        "page": 1,
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "bold": false,
+        "align": "left",
+        "color": "#000000",
+        "validationType": "text",
+        "x": 96.69,
+        "y": 133.88,
+        "width": 245.44,
+        "height": 43.14
+      }
+    ],
+    "unsavedChangesShown": 1,
+    "afterMovingAndResizingOnFillScreen": [
+      {
+        "name": "Surname",
+        "page": 1,
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "bold": false,
+        "align": "left",
+        "color": "#000000",
+        "validationType": "text",
+        "x": 111.56,
+        "y": 156.19,
+        "width": 260.31,
+        "height": 52.06
+      }
+    ],
+    "download": {
+      "fileName": "Fake_Form.pdf",
+      "handedToWriter": [
+        {
+          "page": 1,
+          "text": "Testperson",
+          "x": 111.56,
+          "y": 655.94,
+          "size": 12,
+          "font": "Helvetica",
+          "color": {
+            "type": "RGB",
+            "red": 0,
+            "green": 0,
+            "blue": 0
+          },
+          "rotate": {
+            "type": "degrees",
+            "angle": 0
+          }
+        }
+      ],
+      "readBack": [
+        {
+          "page": 1,
+          "rotation": 0,
+          "width": 595,
+          "height": 842,
+          "items": [
+            {
+              "text": "SAMPLE FORM - TEST DATA ONLY",
+              "x": 50,
+              "y": 800,
+              "size": 14,
+              "angle": 0,
+              "font": "Helvetica"
+            },
+            {
+              "text": "Employer:",
+              "x": 50,
+              "y": 745,
+              "size": 10,
+              "angle": 0,
+              "font": "Helvetica"
+            },
+            {
+              "text": "Employee:",
+              "x": 50,
+              "y": 680,
+              "size": 10,
+              "angle": 0,
+              "font": "Helvetica"
+            },
+            {
+              "text": "Amounts:",
+              "x": 50,
+              "y": 590,
+              "size": 10,
+              "angle": 0,
+              "font": "Helvetica"
+            },
+            {
+              "text": "Testperson",
+              "x": 111.5,
+              "y": 656,
+              "size": 12,
+              "angle": 0,
+              "font": "Helvetica"
+            }
+          ]
+        }
+      ]
+    },
+    "settingsOpenedAfter": {
+      "moving in the editor": 1,
+      "resizing from the bottom-right handle": 0,
+      "resizing from the top-left handle": 0,
+      "moving on the fill-in screen": 1,
+      "resizing on the fill-in screen": 0
+    }
+  },
+  "page saved rotated by 90 degrees": {
+    "pageShownAt": "800 x 565",
+    "afterDrawing": [
+      {
+        "name": "Surname",
+        "page": 1,
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "bold": false,
+        "align": "left",
+        "color": "#000000",
+        "validationType": "text",
+        "x": 105.25,
+        "y": 157.88,
+        "width": 252.6,
+        "height": 29.47
+      }
+    ],
+    "afterMoving": [
+      {
+        "name": "Surname",
+        "page": 1,
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "bold": false,
+        "align": "left",
+        "color": "#000000",
+        "validationType": "text",
+        "x": 168.4,
+        "y": 199.98,
+        "width": 252.6,
+        "height": 29.47
+      }
+    ],
+    "afterResizingFromBottomRight": [
+      {
+        "name": "Surname",
+        "page": 1,
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "bold": false,
+        "align": "left",
+        "color": "#000000",
+        "validationType": "text",
+        "x": 168.4,
+        "y": 199.98,
+        "width": 315.75,
+        "height": 50.52
+      }
+    ],
+    "afterResizingFromTopLeft": [
+      {
+        "name": "Surname",
+        "page": 1,
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "bold": false,
+        "align": "left",
+        "color": "#000000",
+        "validationType": "text",
+        "x": 136.82,
+        "y": 189.45,
+        "width": 347.33,
+        "height": 61.05
+      }
+    ],
+    "afterReload": [
+      {
+        "name": "Surname",
+        "page": 1,
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "bold": false,
+        "align": "left",
+        "color": "#000000",
+        "validationType": "text",
+        "x": 136.82,
+        "y": 189.45,
+        "width": 347.33,
+        "height": 61.05
+      }
+    ],
+    "unsavedChangesShown": 1,
+    "afterMovingAndResizingOnFillScreen": [
+      {
+        "name": "Surname",
+        "page": 1,
+        "fontSize": 12,
+        "fontFamily": "Helvetica",
+        "bold": false,
+        "align": "left",
+        "color": "#000000",
+        "validationType": "text",
+        "x": 157.88,
+        "y": 221.03,
+        "width": 368.38,
+        "height": 73.68
+      }
+    ],
+    "download": {
+      "fileName": "Fake_Form.pdf",
+      "handedToWriter": [
+        {
+          "page": 1,
+          "text": "Testperson",
+          "x": 261.7,
+          "y": 157.88,
+          "size": 12,
+          "font": "Helvetica",
+          "color": {
+            "type": "RGB",
+            "red": 0,
+            "green": 0,
+            "blue": 0
+          },
+          "rotate": {
+            "type": "degrees",
+            "angle": 90
+          }
+        }
+      ],
+      "readBack": [
+        {
+          "page": 1,
+          "rotation": 90,
+          "width": 595,
+          "height": 842,
+          "items": [
+            {
+              "text": "SAMPLE FORM - TEST DATA ONLY",
+              "x": 50,
+              "y": 800,
+              "size": 14,
+              "angle": 0,
+              "font": "Helvetica"
+            },
+            {
+              "text": "Employer:",
+              "x": 50,
+              "y": 745,
+              "size": 10,
+              "angle": 0,
+              "font": "Helvetica"
+            },
+            {
+              "text": "Employee:",
+              "x": 50,
+              "y": 680,
+              "size": 10,
+              "angle": 0,
+              "font": "Helvetica"
+            },
+            {
+              "text": "Amounts:",
+              "x": 50,
+              "y": 590,
+              "size": 10,
+              "angle": 0,
+              "font": "Helvetica"
+            },
+            {
+              "text": "Testperson",
+              "x": 261.5,
+              "y": 158,
+              "size": 12,
+              "angle": 90,
+              "font": "Helvetica"
+            }
+          ]
+        }
+      ]
+    },
+    "settingsOpenedAfter": {
+      "moving in the editor": 1,
+      "resizing from the bottom-right handle": 0,
+      "resizing from the top-left handle": 0,
+      "moving on the fill-in screen": 1,
+      "resizing on the fill-in screen": 0
+    }
+  }
+}
