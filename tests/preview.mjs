@@ -7,7 +7,12 @@
 //     scrolls inside its own frame instead) and every control stays reachable.
 //
 //   npm run check:preview
-import { openFillScreen, seedTemplates, startApp } from "./helpers/app.mjs";
+import {
+  openFillScreen,
+  seedTemplates,
+  startApp,
+  waitForPdfPreview,
+} from "./helpers/app.mjs";
 import { COMPANY_DETAILS, buildSamplePdf, makeTemplate } from "./helpers/fake-data.mjs";
 
 function inspectPreview() {
@@ -124,6 +129,45 @@ try {
         if (positions === "unlocked") await page.getByRole("button", { name: "Positions unlocked" }).click();
       }
     }
+    await context.close();
+  }
+
+  // The new-template screen: the same rules for its preview. Here the page
+  // is drawn at 800px and, as before the redesign, shown smaller only when
+  // the window is too narrow for it (it shrinks to fit, never crops).
+  for (const width of [1440, 720, 420]) {
+    const { context } = await app.newContext({ viewport: { width, height: 900 } });
+    const page = await context.newPage();
+    await page.goto(app.appUrl);
+    await page.getByText("Your templates").waitFor();
+    await seedTemplates(page, []);
+    await page.getByRole("button", { name: "Upload a PDF", exact: true }).click();
+    await page.locator('input[type="file"]').setInputFiles(app.writeTempFile("fake-form.pdf", pdf));
+    await waitForPdfPreview(page);
+
+    const layout = await page.evaluate(inspectLayout);
+    const shown = [];
+    for (const theme of ["dark", "light"]) {
+      await page.evaluate((t) => (document.documentElement.dataset.theme = t), theme);
+      const preview = await page.evaluate(inspectPreview);
+      shown.push(preview.shownAt);
+      if (preview.drawnAt !== "800px") problems.push(`new template, ${width}px: page drawn at ${preview.drawnAt}`);
+      if (parseInt(preview.shownAt, 10) > 800) problems.push(`new template, ${width}px: page shown larger than drawn`);
+      for (const problem of preview.problems) problems.push(`new template, ${theme}, ${width}px: ${problem}`);
+    }
+    const proportions = await page.evaluate(() => {
+      const canvas = document.querySelector("canvas");
+      const rect = canvas.getBoundingClientRect();
+      return Math.abs((rect.width - 2) / (rect.height - 2) - canvas.width / canvas.height) < 0.01;
+    });
+    console.log(
+      `New template, width ${String(width).padStart(4)}px: page drawn at 800px, shown at ${shown[0]}, ` +
+        `proportions kept ${proportions ? "yes" : "NO"}, page scrolls sideways ${layout.pageScrollsSideways ? "YES" : "no"}, ` +
+        `controls cut off: ${layout.controlsCutOff.length}`,
+    );
+    if (!proportions) problems.push(`new template, ${width}px: the page is stretched or squashed`);
+    if (layout.pageScrollsSideways) problems.push(`new template: at ${width}px the whole page scrolls sideways`);
+    for (const control of layout.controlsCutOff) problems.push(`new template: at ${width}px "${control}" is cut off`);
     await context.close();
   }
 

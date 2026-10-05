@@ -15,6 +15,7 @@ import {
   openFillScreen,
   seedTemplates,
   startApp,
+  waitForPdfPreview,
 } from "./helpers/app.mjs";
 import {
   COMPANY_DETAILS,
@@ -166,9 +167,13 @@ function controlsWithoutAName() {
   };
 }
 
-function focusRingOfActiveElement() {
+// `pass` marks the elements one Tab-through has already been to, so each
+// control is counted once and the walk stops when it comes back round.
+function focusRingOfActiveElement(pass) {
   const el = document.activeElement;
-  if (!el || el === document.body) return null;
+  if (!el || el === document.body || el.getAttribute("aria-hidden") === "true") return null;
+  if (el.dataset.a11yTabPass === pass) return { alreadyVisited: true };
+  el.dataset.a11yTabPass = pass;
   const style = getComputedStyle(el);
   const probe = document.createElement("canvas").getContext("2d");
   const same = (a, b) => {
@@ -204,6 +209,7 @@ function movingThings() {
 // ------------------------------------------------------------- reporting
 
 const report = { contrast: { dark: [], light: [] }, names: { total: 0, unnamed: [] }, problems: [] };
+let tabPasses = 0;
 
 async function inspect(target, state) {
   for (const theme of ["dark", "light"]) {
@@ -232,16 +238,14 @@ async function inspect(target, state) {
 // is inside the stand-in dashboard.
 async function tabThroughEverything(page, state, { fromTheTop = true, target = page } = {}) {
   if (fromTheTop) await target.evaluate(() => document.activeElement?.blur());
-  const seen = new Set();
+  const pass = `pass-${++tabPasses}`;
   let checked = 0;
   for (let i = 0; i < 80; i++) {
     await page.keyboard.press("Tab");
     await page.waitForTimeout(40);
-    const ring = await target.evaluate(focusRingOfActiveElement);
+    const ring = await target.evaluate(focusRingOfActiveElement, pass);
     if (!ring) continue;
-    const key = `${ring.element}`;
-    if (seen.has(key) && seen.size > 3) break;
-    seen.add(key);
+    if (ring.alreadyVisited) break;
     checked++;
     if (!ring.ok) report.problems.push(`focus ring [${state}] ${ring.element}: ${ring.found}`);
   }
@@ -491,6 +495,45 @@ async function homeScreen(app) {
   return summary;
 }
 
+async function newTemplateScreen(app) {
+  const pdf = await buildSamplePdf();
+  const summary = { dialogs: {}, focusStops: 0 };
+
+  async function open(options) {
+    const { context } = await app.newContext(options);
+    const page = await context.newPage();
+    await page.goto(app.appUrl);
+    await page.getByText("Your templates").waitFor();
+    await seedTemplates(page, []);
+    await page.getByRole("button", { name: "Upload a PDF", exact: true }).click();
+    await page.getByText("Upload a blank PDF").waitFor();
+    return { context, page };
+  }
+  async function choosePdf(page) {
+    await page.locator('input[type="file"]').setInputFiles(app.writeTempFile("fake-form.pdf", pdf));
+    await page.getByLabel("Template name").waitFor();
+    await waitForPdfPreview(page);
+  }
+
+  const { context, page } = await open();
+  summary.focusStops += await tabThroughEverything(page, "new template: before choosing a file");
+  await choosePdf(page);
+  summary.focusStops += await tabThroughEverything(page, "new template: preview");
+  summary.movingNormally = (await page.evaluate(movingThings)).length;
+  await context.close();
+
+  const still = await open({ reducedMotion: "reduce" });
+  const before = await still.page.evaluate(movingThings);
+  await choosePdf(still.page);
+  summary.stillMovingWithReduceMotion = [...before, ...(await still.page.evaluate(movingThings))];
+  await still.context.close();
+
+  for (const thing of summary.stillMovingWithReduceMotion) {
+    report.problems.push(`new template still moves with "reduce motion": ${thing}`);
+  }
+  return summary;
+}
+
 // Contrast and control names on every screen and dialog, including the
 // ones not restyled yet: the colour tokens are shared, so a change to them
 // reaches all of them.
@@ -502,6 +545,7 @@ async function everyScreen(app) {
 const SCREENS = {
   "fill-in screen": fillInScreen,
   "home screen": homeScreen,
+  "new-template screen": newTemplateScreen,
   "every screen (contrast and names)": everyScreen,
 };
 

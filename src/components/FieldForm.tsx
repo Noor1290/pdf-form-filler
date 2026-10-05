@@ -507,7 +507,7 @@ export function FieldForm({
           <Button onClick={onEditFields}>Add fields</Button>
         </div>
       ) : (
-        <div className="flex w-full flex-col items-start gap-5 xl:flex-row">
+        <div className="flex w-full flex-col items-start gap-5 xl:flex-row xl:justify-between">
           {/* The preview keeps its true size at every window width and
               scrolls sideways inside this frame when the window is narrower
               than the page. Nothing here blurs, tints or overlays the page. */}
