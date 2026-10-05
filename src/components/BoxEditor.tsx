@@ -292,8 +292,8 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
               ref={canvasRef}
               className={
                 canvasSize
-                  ? "rounded-lg border border-border"
-                  : "invisible rounded-lg border border-border"
+                  ? "rounded-lg border border-line"
+                  : "invisible rounded-lg border border-line"
               }
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}

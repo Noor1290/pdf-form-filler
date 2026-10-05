@@ -210,6 +210,7 @@ function movingThings() {
 
 const report = { contrast: { dark: [], light: [] }, names: { total: 0, unnamed: [] }, problems: [] };
 let tabPasses = 0;
+const dialogsSeen = [];
 
 async function inspect(target, state) {
   for (const theme of ["dark", "light"]) {
@@ -252,6 +253,60 @@ async function tabThroughEverything(page, state, { fromTheTop = true, target = p
   return checked;
 }
 
+// Every dialog must be the shared one, dim the screen behind it by 60%,
+// and blur it only when no PDF preview is showing.
+async function overlayRule(target, state) {
+  const found = await target.evaluate(() => {
+    const overlays = document.querySelectorAll('[data-slot="dialog-overlay"]');
+    const dialogs = document.querySelectorAll('[role="dialog"]');
+    const style = overlays.length ? getComputedStyle(overlays[overlays.length - 1]) : null;
+    return {
+      shared: dialogs.length > 0 && Array.from(dialogs).every((d) => d.dataset.slot === "dialog-content"),
+      dim: style?.backgroundColor ?? "none",
+      blur: style?.backdropFilter ?? "none",
+      previewBehind: !!document.querySelector("canvas"),
+    };
+  });
+  dialogsSeen.push({ state, ...found });
+  if (!found.shared) report.problems.push(`dialog [${state}] is not the shared dialog`);
+  if (!/0\.6\)$/.test(found.dim)) report.problems.push(`dialog [${state}] overlay is not a 60% dim (${found.dim})`);
+  if (found.previewBehind && found.blur !== "none") report.problems.push(`dialog [${state}] blurs a PDF preview`);
+  if (!found.previewBehind && !found.blur.startsWith("blur(")) report.problems.push(`dialog [${state}] does not blur a screen without a preview`);
+}
+
+// For dialogs that are not opened by a button (clicking a field, choosing
+// a file): focus is inside, Tab stays inside, Escape closes it.
+async function dialogWithoutOpener(page, state) {
+  await page.getByRole("dialog").last().waitFor();
+  await page.waitForTimeout(250);
+  await overlayRule(page, state);
+  const inside = () =>
+    page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'));
+  const checks = { focusMovedIn: await inside(), tabStaysInside: true };
+  for (let i = 0; i < 10; i++) {
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(40);
+    for (let waited = 0; !(await inside()) && waited < 600; waited += 100) {
+      await page.waitForTimeout(100);
+    }
+    if (!(await inside())) checks.tabStaysInside = false;
+  }
+  // Counted in the page itself: a dialog underneath another one is hidden
+  // from role lookups while the top one is open.
+  const open = () => page.locator('[role="dialog"]').count();
+  const before = await open();
+  await page.keyboard.press("Escape");
+  // The dialog takes a moment to fade out before it is removed.
+  for (let waited = 0; (await open()) >= before && waited < 1500; waited += 100) {
+    await page.waitForTimeout(100);
+  }
+  checks.escapeCloses = (await open()) === before - 1;
+  for (const [check, ok] of Object.entries(checks)) {
+    if (!ok) report.problems.push(`dialog [${state}] ${check} failed`);
+  }
+  return checks;
+}
+
 // Opens a dialog from the keyboard and checks the whole round trip.
 async function dialogRoundTrip(page, openerName, state) {
   const opener = page.getByRole("button", { name: openerName, exact: true }).first();
@@ -263,6 +318,7 @@ async function dialogRoundTrip(page, openerName, state) {
   const inside = () =>
     page.evaluate(() => !!document.activeElement?.closest('[role="dialog"], [role="alertdialog"]'));
 
+  await overlayRule(page, state);
   const checks = { focusMovedIn: await inside(), tabStaysInside: true };
   for (let i = 0; i < 12; i++) {
     await page.keyboard.press("Tab");
@@ -573,6 +629,7 @@ async function fieldEditorScreen(app) {
   await page.mouse.up();
   await page.getByRole("dialog").waitFor();
   await page.waitForTimeout(250);
+  await overlayRule(page, "field editor: Name this field");
   const naming = {
     cursorStartsInNameBox: await page.evaluate(
       () => document.activeElement?.getAttribute("aria-label") === "Name this field",
@@ -607,6 +664,94 @@ async function fieldEditorScreen(app) {
   return summary;
 }
 
+async function companyDetailsScreen(app) {
+  const pdf = await buildSamplePdf();
+  const summary = { dialogs: {}, focusStops: 0 };
+  const legacy = { "pdf-editor:employer-fields": JSON.stringify(COMPANY_DETAILS) };
+
+  async function open(options) {
+    const { context } = await app.newContext(options);
+    const page = await context.newPage();
+    await page.goto(app.appUrl);
+    await page.getByText("Your templates").waitFor();
+    await seedTemplates(page, [makeTemplate(pdf)], legacy);
+    await page.getByRole("button", { name: "Company details", exact: true }).click();
+    await page.getByRole("button", { name: "Start blank" }).waitFor();
+    return { context, page };
+  }
+
+  const { context, page } = await open();
+  summary.focusStops += await tabThroughEverything(page, "company details: copy or start blank");
+  await page.getByRole("button", { name: "Copy my existing company details" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).waitFor();
+  summary.focusStops += await tabThroughEverything(page, "company details: editor");
+  const opener = 'Remove field "Company Name"';
+  summary.dialogs[opener] = await dialogRoundTrip(page, opener, `company details: ${opener}`);
+  summary.movingNormally = (await page.evaluate(movingThings)).length;
+  await context.close();
+
+  const still = await open({ reducedMotion: "reduce" });
+  summary.stillMovingWithReduceMotion = await still.page.evaluate(movingThings);
+  await still.context.close();
+  for (const thing of summary.stillMovingWithReduceMotion) {
+    report.problems.push(`company details still moves with "reduce motion": ${thing}`);
+  }
+  return summary;
+}
+
+// The dialogs not covered above: field settings (in the editor and on the
+// fill-in screen), the import preview and its Replace confirmation.
+async function remainingDialogs(app) {
+  const pdf = await buildSamplePdf();
+  const summary = { dialogs: {}, focusStops: 0, stillMovingWithReduceMotion: [], movingNormally: 0 };
+  const { context } = await app.newContext();
+  const page = await context.newPage();
+  await page.goto(app.appUrl);
+  await page.getByText("Your templates").waitFor();
+  await seedTemplates(page, [makeTemplate(pdf, { employerFields: COMPANY_DETAILS })]);
+
+  await page.getByRole("button", { name: "Edit fields" }).click();
+  await waitForPdfPreview(page);
+  let canvas = await page.locator("canvas").first().boundingBox();
+  await page.mouse.click(canvas.x + 300, canvas.y + 215);
+  summary.dialogs["Field settings (field editor)"] = await dialogWithoutOpener(page, "field settings, field editor");
+  await page.getByRole("button", { name: "Back to templates" }).click();
+
+  await openFillScreen(page, "Fake Form");
+  canvas = await page.locator("canvas").first().boundingBox();
+  await page.mouse.click(canvas.x + 300, canvas.y + 215);
+  summary.dialogs["Field settings (fill-in screen)"] = await dialogWithoutOpener(page, "field settings, fill-in screen");
+
+  await page.getByLabel("Surname", { exact: true }).fill("Testperson");
+  await page.getByRole("button", { name: "Add & fill next person" }).click();
+  const choose = () =>
+    page
+      .locator('input[type="file"]')
+      .setInputFiles(app.writeTempFile("payroll-fake.json", JSON.stringify(PAYROLL_ROWS)));
+  await choose();
+  summary.dialogs["Import preview"] = await dialogWithoutOpener(page, "import preview");
+
+  // The Replace confirmation opens on top of the preview: Escape must close
+  // only the confirmation and hand focus back to the Import button.
+  await choose();
+  await page.getByRole("dialog").waitFor();
+  await page.getByRole("dialog").getByRole("button", { name: "Add to", exact: true }).click();
+  const importButton = page.getByRole("dialog").getByRole("button", { name: "Import 3 people" });
+  await importButton.focus();
+  await page.keyboard.press("Enter");
+  await page.getByText("Replace existing people?").waitFor();
+  const confirmation = await dialogWithoutOpener(page, "replace confirmation");
+  confirmation.previewStaysOpen = (await page.locator('[role="dialog"]').count()) === 1;
+  await page.waitForTimeout(200);
+  confirmation.focusReturns = await importButton.evaluate((el) => el === document.activeElement);
+  for (const check of ["previewStaysOpen", "focusReturns"]) {
+    if (!confirmation[check]) report.problems.push(`dialog [replace confirmation] ${check} failed`);
+  }
+  summary.dialogs["Replace confirmation"] = confirmation;
+  await context.close();
+  return summary;
+}
+
 // Contrast and control names on every screen and dialog, including the
 // ones not restyled yet: the colour tokens are shared, so a change to them
 // reaches all of them.
@@ -620,6 +765,8 @@ const SCREENS = {
   "home screen": homeScreen,
   "new-template screen": newTemplateScreen,
   "field editor": fieldEditorScreen,
+  "company details": companyDetailsScreen,
+  "remaining dialogs": remainingDialogs,
   "every screen (contrast and names)": everyScreen,
 };
 
@@ -647,16 +794,30 @@ for (const theme of ["dark", "light"]) {
 }
 console.log(`Names: ${report.names.total} controls checked, ${report.names.unnamed.length} without a name.`);
 for (const html of report.names.unnamed) report.problems.push(`no accessible name: ${html}`);
+{
+  const overPreview = dialogsSeen.filter((d) => d.previewBehind);
+  const elsewhere = dialogsSeen.filter((d) => !d.previewBehind);
+  console.log(
+    `Dialog overlay: ${dialogsSeen.length} dialogs opened, all the shared dialog: ` +
+      `${dialogsSeen.every((d) => d.shared) ? "yes" : "NO"}; ` +
+      `${overPreview.length} over a PDF preview, blurred: ${overPreview.filter((d) => d.blur !== "none").length}; ` +
+      `${elsewhere.length} on screens without one, blurred: ${elsewhere.filter((d) => d.blur !== "none").length}.`,
+  );
+}
 for (const [name, summary] of Object.entries(summaries)) {
   if (!summary) continue;
-  console.log(`Focus ring (${name}): ${summary.focusStops} Tab stops checked for a 2px solid accent outline.`);
+  if (summary.focusStops > 0) {
+    console.log(`Focus ring (${name}): ${summary.focusStops} Tab stops checked for a 2px solid accent outline.`);
+  }
   for (const [opener, checks] of Object.entries(summary.dialogs)) {
     console.log(`Dialog "${opener}": ${Object.entries(checks).map(([k, v]) => `${k} ${v ? "yes" : "NO"}`).join(", ")}.`);
   }
-  console.log(
-    `Reduce motion (${name}): ${summary.stillMovingWithReduceMotion.length} things still moving ` +
-      `(${summary.movingNormally} have motion when it is not requested).`,
-  );
+  if (summary.movingNormally > 0) {
+    console.log(
+      `Reduce motion (${name}): ${summary.stillMovingWithReduceMotion.length} things still moving ` +
+        `(${summary.movingNormally} have motion when it is not requested).`,
+    );
+  }
 }
 
 if (report.problems.length > 0) {

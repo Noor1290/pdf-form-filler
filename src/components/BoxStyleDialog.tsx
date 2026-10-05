@@ -72,7 +72,7 @@ export function BoxStyleDialog({ box, onChange, onClose }: BoxStyleDialogProps) 
                 </Button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted">
               "Amount" gently warns if what's typed doesn't look like a
               number — it never changes what you typed.
             </p>

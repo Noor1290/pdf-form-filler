@@ -532,8 +532,8 @@ export function FieldForm({
                 ref={pdfCanvasRef}
                 className={
                   canvasSize
-                    ? "rounded-lg border border-border"
-                    : "invisible rounded-lg border border-border"
+                    ? "rounded-lg border border-line"
+                    : "invisible rounded-lg border border-line"
                 }
               />
               <canvas

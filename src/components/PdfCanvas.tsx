@@ -53,8 +53,8 @@ export function PdfCanvas({ source, onError }: PdfCanvasProps) {
         ref={canvasRef}
         className={
           loading
-            ? "invisible max-w-full rounded-lg border border-border"
-            : "max-w-full rounded-lg border border-border"
+            ? "invisible max-w-full rounded-lg border border-line"
+            : "max-w-full rounded-lg border border-line"
         }
       />
     </div>

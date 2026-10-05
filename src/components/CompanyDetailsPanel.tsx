@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Trash2Icon } from "lucide-react";
+import { CheckIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -108,12 +108,12 @@ export function CompanyDetailsPanel({
 
   if (fields === null) {
     return (
-      <div className="flex w-full max-w-md flex-col gap-6">
+      <div className="flex w-full max-w-2xl animate-rise flex-col gap-6">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
+          <h2 className="text-2xl font-semibold tracking-tight text-fg">
             Company details for "{template.name}"
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted">
             {hasLegacyData
               ? "You have company details saved from before. Start this template from those, or start blank?"
               : "Fill in company details for this template — filled in automatically wherever a field matches."}
@@ -141,13 +141,13 @@ export function CompanyDetailsPanel({
   }
 
   return (
-    <div className="flex w-full max-w-md flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
+    <div className="flex w-full max-w-2xl animate-rise flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
+          <h2 className="text-2xl font-semibold tracking-tight text-fg">
             Company details
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted">
             For "{template.name}" — filled in automatically wherever a field
             matches.
           </p>
@@ -161,22 +161,22 @@ export function CompanyDetailsPanel({
         {fields.map((field) => (
           <div
             key={field.id}
-            className="relative flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+            className="glass relative flex flex-col gap-3 p-4"
           >
             <Button
               variant="ghost"
               size="icon-sm"
               aria-label={`Remove field "${field.label || "(unnamed field)"}"`}
-              className="absolute top-3 right-3 text-muted-foreground hover:text-destructive"
+              className="absolute top-3 right-3 hover:text-danger"
               onClick={() => setDeletingField(field)}
             >
               <Trash2Icon />
             </Button>
 
-            <div className="flex flex-col gap-1 pr-8">
+            <div className="flex flex-col gap-1.5 pr-10">
               <label
                 htmlFor={`employer-label-${field.id}`}
-                className="text-xs font-medium text-muted-foreground"
+                className="text-xs font-medium text-muted"
               >
                 Field name
               </label>
@@ -186,14 +186,14 @@ export function CompanyDetailsPanel({
                 onChange={(event) =>
                   updateLabel(field.id, event.target.value)
                 }
-                className="h-7 text-sm"
+                className="text-sm"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1.5">
               <label
                 htmlFor={`employer-value-${field.id}`}
-                className="text-sm font-medium"
+                className="text-sm font-medium text-fg"
               >
                 {field.label || "(unnamed field)"}
               </label>
@@ -210,13 +210,17 @@ export function CompanyDetailsPanel({
       </div>
 
       <Button variant="outline" onClick={handleAddField}>
+        <PlusIcon />
         Add field
       </Button>
 
       <div className="flex items-center gap-2">
         <Button onClick={handleSave}>Save</Button>
         {saved && (
-          <span className="text-sm text-muted-foreground">Saved</span>
+          <span className="badge text-fg">
+            <CheckIcon className="size-3 text-accent" />
+            Saved
+          </span>
         )}
       </div>
 
@@ -225,7 +229,7 @@ export function CompanyDetailsPanel({
         onOpenChange={(open) => !open && setDeletingField(null)}
       >
         <DialogContent>
-          <DialogHeader>
+          <DialogHeader icon={<Trash2Icon />} tone="danger">
             <DialogTitle>Remove this field?</DialogTitle>
             <DialogDescription>
               This will remove "{deletingField?.label || "(unnamed field)"}"
