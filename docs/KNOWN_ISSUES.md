@@ -7,72 +7,10 @@ evidence uses fake data.
 
 # Not fixed
 
-## 1. A person being typed in is lost by clicking another person, or by "Clear all"
+## 1. (Fixed) A person being typed in is lost by clicking another person, or by "Clear all"
 
-**Priority: HIGH**, both routes (1a and 1b). They silently lose data someone
-has just typed. To be fixed on their own branch after the redesign.
-
-**Where:** fill-in screen, People list.
-
-### 1a. Clicking another person (HIGH)
-
-**What happens:** add a first person, start typing a second one, then click
-"Person 1" in the list before pressing "Add & fill next person". The second
-person's typed values disappear. There is no warning and no way to get them
-back.
-
-**How to reproduce, step by step** (any template with at least one field; the
-evidence below used a template called "Fake Form" with a field called
-"Surname"):
-
-1. Open the template from the home screen, so the fill-in screen shows.
-2. Type "Testperson" into Surname.
-3. Press "Add & fill next person". The People list now shows "Person 1" and
-   the form is empty again.
-4. Type "Sampleton" into Surname. Do not press "Add & fill next person".
-5. Click "Person 1" in the People list.
-
-Expected: the second person is kept (added to the list), or the app asks
-before throwing the typed values away.
-
-Actual: the form shows "Testperson" again, the People list still has only
-"Person 1", and "Sampleton" is gone.
-
-**Evidence:**
-
-| Step | People listed | Surname box |
-| --- | --- | --- |
-| After step 4 | 1 | Sampleton |
-| After step 5 | 1 | Testperson |
-
-After step 5, "Sampleton" is nowhere on the screen or in any box, and no
-dialog asked first.
-
-**Where in the code:** the function handleSelectEntry in
-src/components/FieldForm.tsx. When no listed person is selected (the form
-holds a new, unadded person) it replaces the form's values without saving
-them anywhere.
-
-### 1b. Pressing "Clear all" (HIGH)
-
-**How to reproduce:** follow steps 1 to 4 above, then press "Clear all" and
-confirm.
-
-Expected: the confirmation says that the person being typed will be thrown
-away too, or keeps them.
-
-Actual: the confirmation only counts the people in the list ("This will
-remove everyone added to this batch (1 person)."), and confirming also empties
-the form.
-
-**Evidence:** with the same fake data, after confirming, 0 people are listed
-and the Surname box is empty.
-
-### Not affected
-
-Clicking Download PDF with a second person typed but not yet added does
-include them. The safety-net test covers this:
-`secondPersonTypedButNotAddedDownload` produces 2 pages.
+Fixed after the audit; see "Fixed after the audit" at the end of this file.
+The number is kept so the items below keep theirs.
 
 ## 2. Moving a field opens its settings
 
@@ -131,6 +69,31 @@ while the file is made, and the Save buttons read "Saving…" for a moment. Both
 are too brief to record reliably, so those two strings are not covered by the
 check. They are unchanged in the code.
 
+## 6. Something typed in the last moment before leaving the fill-in screen is not saved
+
+**Priority: to be decided.** Found while fixing the audit's items; not part
+of them, so not fixed. It was already so before those fixes.
+
+**Where:** fill-in screen.
+
+**What happens:** typed values and the People list are saved about 0.4
+seconds after the last change. Pressing "Back to templates" or "Edit fields"
+inside that 0.4 seconds cancels the save that was waiting, so the last change
+is not stored. Nothing warns.
+
+**How to reproduce:** open a template, type into a field and press "Back to
+templates" straight away. Open the template again: the field is empty.
+
+**Evidence** (fake data, a template with one field called "ID"):
+
+| Typed | Wait before "Back to templates" | Stored for the field |
+| --- | --- | --- |
+| TST001 | none | nothing |
+| TST001 | 1 second | TST001 |
+
+**Where in the code:** the two delayed saves in src/components/FieldForm.tsx
+cancel their timer when the screen closes instead of saving first.
+
 # Fixed during the redesign
 
 Small behaviour changes made on purpose, each approved, because the redesign's
@@ -172,3 +135,63 @@ The "Remove this field?" dialog has no text box, so it never had the quirk.
 `npm run check:a11y` confirms it: focus moves into the dialog, Tab stays
 inside, Escape closes it, and focus returns to the Remove button that opened
 it. No code was changed for this.
+
+# Fixed after the audit
+
+Each has a test in `tests/audit.test.mjs` (`npm run test:audit`) that fails
+without the fix. All evidence uses fake data.
+
+## A person being typed in was lost by clicking another person, or by "Clear all" (was item 1, HIGH)
+
+Re-tested before fixing, with the steps recorded under item 1: both routes
+still lost the typed person.
+
+**1a. Clicking another person.** A person typed into the form but not added
+yet is now added to the People list first, then the clicked person is shown.
+Nothing is asked. A form that holds only the company details, or nothing, is
+not a person and adds nobody.
+
+| Step | People listed | Surname box |
+| --- | --- | --- |
+| "SAMPLETON" typed, not added | 1 | SAMPLETON |
+| "Person 1" clicked | 2 | TESTER |
+| "Person 2" clicked | 2 | SAMPLETON |
+
+**1b. "Clear all".** The confirmation is unchanged ("This will remove
+everyone added to this batch (1 person)."), and that is now all it does: the
+person still being typed stays in the form. When the form shows one of the
+listed people, it is emptied with them, as before.
+
+## After leaving a template and coming back, the download had an extra page (HIGH)
+
+The form's last values were saved without saying whose they were, so on
+coming back the last person was taken for someone new: 3 people gave 4 pages,
+the last person twice. The form's saved values are now compared with the
+listed people; when they are exactly one person's, that person is selected
+again. Values that match nobody are still a new person, and are still in the
+download.
+
+## One character the fonts cannot print stopped the whole download (HIGH)
+
+The three built-in fonts only have Western European characters. A value with
+any other character (for example the first letter of a Polish first name)
+used to end the download for everyone with "Something went wrong creating
+your PDF." Now each such character is replaced with "?" in its own field (a
+line break or tab with a space), the download finishes, and a dialog lists
+the people and fields concerned. What is typed and stored is not changed.
+
+Still true: those characters cannot be printed. Printing them needs a font
+with wider coverage, which the project rules leave for later.
+
+## With the browser's storage full, imported people looked saved and were lost on reload (CRITICAL)
+
+Every save now reports whether the browser accepted it. On the fill-in
+screen a refused save opens a warning that has to be answered ("This was NOT
+saved"), and a notice stays on the screen, with "Not saved" beside the People
+heading, until a save works. The people stay on screen so the PDF can still
+be downloaded; "Try saving again" saves them once there is room. The field
+editor, company details and renaming a template show the same warning instead
+of failing silently.
+
+Not changed: the PDFs themselves are still kept in this storage, which is
+what fills it (see the audit report, risk R2).

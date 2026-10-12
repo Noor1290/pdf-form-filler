@@ -379,9 +379,10 @@ test("evidence (LIMIT): fields can only be placed on the first page of a form", 
   await context.close();
 });
 
-// Coming back to a template shows the last person's values in the form with
-// nobody selected, and the download treats that as one more person.
-test("evidence (BUG): after leaving and coming back, the download has an extra page: the last person twice", TIMEOUT, async () => {
+// Fixed (was High). Coming back to a template used to show the last person's
+// values in the form with nobody selected, and the download took that for one
+// more person: a fourth page, the last person twice.
+test("after leaving and coming back, the download still has one page per person, and the person left in the form is selected again", TIMEOUT, async () => {
   const pdf = await blankForm();
   const { context, page } = await openApp([template(pdf)]);
   await openFillScreen(page, "TEST Form");
@@ -391,11 +392,124 @@ test("evidence (BUG): after leaving and coming back, the download has an extra p
   await page.getByRole("button", { name: "Back to templates" }).click();
   await openFillScreen(page, "TEST Form");
   assert.equal(await peopleCount(page), 3);
+  // The form shows the third person, and the list says so.
+  assert.equal(await page.getByLabel("ID", { exact: true }).inputValue(), "TST003");
+  assert.equal(await page.getByRole("button", { name: "Person 3", exact: true }).getAttribute("aria-current"), "true");
   const pages = await readVisualText((await download(page)).bytes);
   assert.deepEqual(
     pages.map((p) => p.items.find((i) => /^TST/.test(i.text))?.text),
-    ["TST001", "TST002", "TST003", "TST003"],
+    ["TST001", "TST002", "TST003"],
   );
+  // The same after a reload, and nobody was added to what is stored.
+  await page.reload();
+  await page.getByText("Your templates").waitFor();
+  await openFillScreen(page, "TEST Form");
+  assert.equal((await readVisualText((await download(page)).bytes)).length, 3);
+  const [stored] = await readStoredTemplates(page);
+  assert.deepEqual(stored.entries.map((e) => e.values["b-id"]), ["TST001", "TST002", "TST003"]);
+  await context.close();
+});
+
+// A person typed in but not added yet is still someone new after coming
+// back: they are not mistaken for a listed person, and are in the download.
+test("after leaving and coming back, a person typed in but not added yet is still in the form and in the download", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context, page } = await openApp([template(pdf, { entries: entriesFor(PEOPLE.slice(0, 2)) })]);
+  await openFillScreen(page, "TEST Form");
+  await page.getByLabel("ID", { exact: true }).fill("TST009");
+  await readStoredTemplates(page); // gives the app time to save
+  await page.getByRole("button", { name: "Back to templates" }).click();
+  await openFillScreen(page, "TEST Form");
+  assert.equal(await peopleCount(page), 2);
+  assert.equal(await page.getByLabel("ID", { exact: true }).inputValue(), "TST009");
+  assert.equal(await page.locator('[aria-current="true"]').count(), 0);
+  const pages = await readVisualText((await download(page)).bytes);
+  assert.deepEqual(
+    pages.map((p) => p.items.find((i) => /^TST/.test(i.text))?.text),
+    ["TST001", "TST002", "TST009"],
+  );
+  await context.close();
+});
+
+// ================================================= a person being typed in
+
+// Fixed (was High, docs/KNOWN_ISSUES.md item 1a). Clicking a listed person
+// while a new one was typed in but not added yet threw the new one away.
+test("clicking another person keeps the person being typed: they are added to the list first", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const employerFields = [{ id: "companyName", label: "Company Name", value: "TEST Co A" }];
+  const { context, page } = await openApp([template(pdf, { employerFields })]);
+  await openFillScreen(page, "TEST Form");
+  const field = (name) => page.getByLabel(name, { exact: true });
+  const person = (n) => page.getByRole("button", { name: `Person ${n}`, exact: true });
+
+  await field("Surname").fill("TESTER");
+  await field("ID").fill("TST001");
+  await page.getByRole("button", { name: "Add & fill next person" }).click();
+  assert.equal(await peopleCount(page), 1);
+
+  // A form holding only the company details is not a person: nobody is added.
+  assert.equal(await field("Company Name").inputValue(), "TEST Co A");
+  await person(1).click();
+  assert.equal(await peopleCount(page), 1);
+  await page.getByRole("button", { name: "Add & fill next person" }).click();
+  assert.equal(await peopleCount(page), 1);
+
+  // A second person typed in, then "Person 1" clicked before adding them.
+  await field("Surname").fill("SAMPLETON");
+  await field("ID").fill("TST002");
+  await person(1).click();
+  assert.equal(await page.getByRole("dialog").count(), 0);
+  assert.equal(await field("ID").inputValue(), "TST001");
+  assert.equal(await peopleCount(page), 2, "the person being typed was added to the list");
+  await person(2).click();
+  assert.deepEqual([await field("ID").inputValue(), await field("Surname").inputValue()], ["TST002", "SAMPLETON"]);
+
+  // Clicking back and forth again adds nobody else.
+  await person(1).click();
+  await person(2).click();
+  assert.equal(await peopleCount(page), 2);
+  const [stored] = await readStoredTemplates(page);
+  assert.deepEqual(stored.entries.map((e) => [e.values["b-id"], e.values["b-surname"]]), [["TST001", "TESTER"], ["TST002", "SAMPLETON"]]);
+  const pages = await readVisualText((await download(page)).bytes);
+  assert.deepEqual(pages.map((p) => p.items.find((i) => /^TST\d/.test(i.text))?.text), ["TST001", "TST002"]);
+  await context.close();
+});
+
+// Fixed (was High, docs/KNOWN_ISSUES.md item 1b). "Clear all" removes the
+// people in the list, as its confirmation says; it used to empty the form of
+// a person still being typed as well.
+test("Clear all removes the listed people and leaves the person being typed in the form", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context, page } = await openApp([template(pdf)]);
+  await openFillScreen(page, "TEST Form");
+  const field = (name) => page.getByLabel(name, { exact: true });
+  const clearAll = async () => {
+    await page.getByRole("button", { name: "Clear all" }).click();
+    await dialog(page).getByRole("button", { name: "Clear all" }).click();
+    await page.getByRole("dialog").first().waitFor({ state: "hidden" });
+  };
+
+  await field("ID").fill("TST001");
+  await page.getByRole("button", { name: "Add & fill next person" }).click();
+  await field("ID").fill("TST002");
+  await field("Surname").fill("SAMPLETON");
+  await page.getByRole("button", { name: "Clear all" }).click();
+  assert.ok((await dialog(page).textContent()).includes("This will remove everyone added to this batch (1 person)."));
+  await dialog(page).getByRole("button", { name: "Clear all" }).click();
+  await page.getByRole("dialog").first().waitFor({ state: "hidden" });
+  assert.equal(await peopleCount(page), 0);
+  assert.deepEqual([await field("ID").inputValue(), await field("Surname").inputValue()], ["TST002", "SAMPLETON"]);
+  const pages = await readVisualText((await download(page)).bytes);
+  assert.deepEqual(pages.map((p) => p.items.find((i) => /^TST\d/.test(i.text))?.text), ["TST002"]);
+
+  // When the form shows one of the listed people, it is emptied with them.
+  await page.getByRole("button", { name: "Add & fill next person" }).click();
+  await page.getByRole("button", { name: "Person 1", exact: true }).click();
+  assert.equal(await field("ID").inputValue(), "TST002");
+  await clearAll();
+  assert.equal(await peopleCount(page), 0);
+  assert.equal(await field("ID").inputValue(), "");
   await context.close();
 });
 
@@ -419,20 +533,67 @@ test("evidence (BUG): a value longer than its box runs past the box; nothing shr
   await context.close();
 });
 
-test("evidence (BUG): one character the PDF fonts cannot print stops the whole download, with a message that does not say why", TIMEOUT, async () => {
+// Fixed (was High). One such character used to stop the whole download, for
+// everyone, with "Something went wrong creating your PDF. Please try again."
+test("a character the PDF fonts cannot print is replaced with \"?\" in its own field; the download finishes and the people and fields are listed", TIMEOUT, async () => {
   const pdf = await blankForm();
-  // "Łukasz" has a letter outside the three built-in fonts' character set.
-  const people = [PEOPLE[0], { ...PEOPLE[1], "Other Names": "Łukasz" }, PEOPLE[2]];
+  // "Ł" and "ń" are outside the three built-in fonts' character set; "é" is in it.
+  const people = [
+    PEOPLE[0],
+    { ...PEOPLE[1], Surname: "TESTER-Wroński", "Other Names": "Łukasz Renée" },
+    { ...PEOPLE[2], "Other Names": "Gamma\tDelta" },
+  ];
   const { context, page } = await openApp([template(pdf, { entries: entriesFor(people) })]);
   await openFillScreen(page, "TEST Form");
   await page.getByRole("button", { name: "Person 1", exact: true }).click();
-  let downloaded = false;
-  page.once("download", () => (downloaded = true));
-  await page.getByRole("button", { name: "Download PDF" }).click();
-  await page.getByText("Something went wrong creating your PDF. Please try again.").waitFor();
-  assert.equal(downloaded, false, "nothing is downloaded, not even the two people whose values are fine");
-  const message = await page.locator(".notice-danger").textContent();
-  assert.ok(!/Łukasz|character|Person 2|Other Names/.test(message), `the message names the problem: ${message}`);
+
+  const file = await download(page);
+  const pages = await readVisualText(file.bytes);
+  assert.equal(pages.length, 3, "everyone is in the download");
+  const texts = pages.map((p) => p.items.map((i) => i.text));
+  // Only the unprintable characters are replaced, each in its own field.
+  assert.ok(texts[1].includes("?ukasz Renée"), texts[1].join(" | "));
+  assert.ok(texts[1].includes("TESTER-Wro?ski"), texts[1].join(" | "));
+  assert.ok(texts[2].includes("Gamma Delta"), texts[2].join(" | "));
+  // Everything else is exactly as before, in its box.
+  for (const [index, person] of [[0, PEOPLE[0]], [1, PEOPLE[1]], [2, PEOPLE[2]]]) {
+    for (const name of ["ID", "Basic Salary", "Net Pay", "Company Name"]) {
+      const b = BOXES.find((candidate) => candidate.name === name);
+      const found = pages[index].items.filter((i) => i.text === person[name]);
+      assert.equal(found.length, 1, `page ${index + 1}, ${name}`);
+      assertInsideBox(found[0], b, `page ${index + 1}, ${name}`);
+    }
+  }
+  assert.equal(pages[0].items.filter((i) => i.text.includes("?")).length, 0);
+
+  // Afterwards the people and fields are listed, in a dialog that waits.
+  const report = dialog(page);
+  await report.getByText("Some characters could not be printed").waitFor();
+  assert.deepEqual(await report.locator("li").allTextContents(), [
+    "Person 2, Surname: ń",
+    "Person 2, Other Names: Ł",
+    "Person 3, Other Names: line break or tab",
+  ]);
+  assert.equal(await page.locator(".notice-danger").count(), 0, "no error is shown");
+  await report.getByRole("button", { name: "OK" }).click();
+  await page.getByRole("dialog").first().waitFor({ state: "hidden" });
+  // What is stored and shown on screen is still what was typed.
+  await page.getByRole("button", { name: "Person 2", exact: true }).click();
+  assert.equal(await page.getByLabel("Other Names", { exact: true }).inputValue(), "Łukasz Renée");
+  await context.close();
+});
+
+test("a single person typed into the form: an unprintable character is replaced and the field is named", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context, page } = await openApp([template(pdf)]);
+  await openFillScreen(page, "TEST Form");
+  await page.getByLabel("ID", { exact: true }).fill("TST001");
+  await page.getByLabel("Other Names", { exact: true }).fill("Łukasz");
+  const pages = await readVisualText((await download(page)).bytes);
+  assert.equal(pages.length, 1);
+  assert.ok(pages[0].items.some((i) => i.text === "?ukasz"));
+  await dialog(page).getByText("Some characters could not be printed").waitFor();
+  assert.deepEqual(await dialog(page).locator("li").allTextContents(), ["Other Names: Ł"]);
   await context.close();
 });
 
@@ -520,26 +681,130 @@ test("evidence (BUG): a PDF too large for the browser's storage cannot be saved,
   await context.close();
 });
 
-test("evidence (BUG): when storage is full, imported people look saved but are gone after a reload, with no warning", TIMEOUT, async () => {
+// Fixed (was Critical). The people used to look saved, nothing warned, and a
+// reload emptied the list; the refused save only reached the browser console.
+test("when storage is full, imported people are marked NOT saved behind a blocking warning, and are saved once there is room", TIMEOUT, async () => {
   const pdf = await blankForm();
   const { context, page, pageErrors } = await openApp([template(pdf)]);
   await fillStorage(page);
   await openFillScreen(page, "TEST Form");
-  await importFile(page, "people.json", JSON.stringify(PEOPLE));
-  assert.equal(await peopleCount(page), 3);
+  // Opening the screen changes nothing, so nothing is reported yet.
   await page.waitForTimeout(1200);
-  // Nothing on screen says the save failed...
-  assert.equal(await page.locator(".notice-danger").count(), 0);
+  assert.equal(await page.getByRole("dialog").count(), 0);
   assert.equal(await page.getByRole("alert").count(), 0);
-  // ...but the browser refused it (the error only reaches the console),
-  assert.ok(pageErrors.some((e) => /quota/i.test(e)), `page errors: ${pageErrors.join(" | ")}`);
+
+  await importFile(page, "people.json", JSON.stringify(PEOPLE));
+  // A warning opens by itself and stays until it is answered.
+  const warning = page.getByRole("dialog");
+  await warning.getByText("This was NOT saved").waitFor();
+  assert.ok((await warning.textContent()).includes("The browser's storage for this tool is full, so your last change could not be saved."));
+  await page.waitForTimeout(1200);
+  assert.equal(await warning.count(), 1);
+  await warning.getByRole("button", { name: "OK" }).click();
+  await warning.waitFor({ state: "hidden" });
+
+  // The people are still there to download, and marked as not saved.
+  assert.equal(await peopleCount(page), 3);
+  const notice = page.getByRole("alert");
+  assert.ok((await notice.textContent()).startsWith("NOT saved."), await notice.textContent());
+  assert.equal(await page.getByText("Not saved", { exact: true }).count(), 1);
+  assert.equal((await readVisualText((await download(page)).bytes)).length, 3);
   const [stored] = await readStoredTemplates(page);
-  assert.equal((stored.entries ?? []).length, 0);
-  // ...so after a reload everyone is gone.
+  assert.equal((stored.entries ?? []).length, 0, "nothing was stored, as the screen says");
+  assert.deepEqual(pageErrors, [], "the refused save is handled, not thrown");
+
+  // Typing more does not open the warning again; the notice stays.
+  await page.getByLabel("TAN", { exact: true }).fill("TEST-TAN-1");
+  await page.waitForTimeout(1200);
+  assert.equal(await page.getByRole("dialog").count(), 0);
+  assert.equal(await notice.count(), 1);
+
+  // Trying again with no room says so again.
+  await notice.getByRole("button", { name: "Try saving again" }).click();
+  await warning.getByText("This was NOT saved").waitFor();
+  await warning.getByRole("button", { name: "OK" }).click();
+  await warning.waitFor({ state: "hidden" });
+  assert.equal(await notice.count(), 1);
+
+  // With room made, trying again saves everyone and the notice goes.
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) if (key.startsWith("zz_test_fill_")) localStorage.removeItem(key);
+  });
+  await notice.getByRole("button", { name: "Try saving again" }).click();
+  await notice.waitFor({ state: "hidden" });
+  assert.equal(await page.getByRole("dialog").count(), 0);
+  assert.equal(await page.getByText("Not saved", { exact: true }).count(), 0);
+  await page.reload();
+  await page.getByText("Your templates").waitFor();
+  await openFillScreen(page, "TEST Form");
+  assert.equal(await peopleCount(page), 3);
+  assert.equal(await page.getByLabel("TAN", { exact: true }).inputValue(), "TEST-TAN-1");
+  await context.close();
+});
+
+test("when storage is full, a reload shows exactly what the screen said was saved: nobody", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context, page } = await openApp([template(pdf)]);
+  await fillStorage(page);
+  await openFillScreen(page, "TEST Form");
+  await importFile(page, "people.json", JSON.stringify(PEOPLE));
+  await page.getByRole("dialog").getByRole("button", { name: "OK" }).click();
+  assert.equal(await page.getByRole("alert").count(), 1);
   await page.reload();
   await page.getByText("Your templates").waitFor();
   await openFillScreen(page, "TEST Form");
   assert.equal(await peopleCount(page), 0);
+  assert.equal(await page.getByRole("alert").count(), 0);
+  await context.close();
+});
+
+test("when storage is full, the other saves say so too: field positions, company details and a template's name", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const employerFields = [{ id: "companyName", label: "Company Name", value: "TEST Co A" }];
+  const { context, page, pageErrors } = await openApp([template(pdf, { employerFields })]);
+  await fillStorage(page);
+  const warning = page.getByRole("dialog").filter({ hasText: "This was NOT saved" });
+  const acknowledge = async () => {
+    await warning.waitFor();
+    await warning.getByRole("button", { name: "OK" }).click();
+    await warning.waitFor({ state: "hidden" });
+  };
+
+  // A longer name does not fit: the list keeps the name that is stored.
+  await page.getByRole("button", { name: "Rename" }).click();
+  await page.getByRole("dialog").getByRole("textbox").fill("TEST Form with a much longer name");
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await acknowledge();
+  assert.equal(await page.getByRole("button", { name: /^TEST Form Last updated/ }).count(), 1);
+
+  // Company details: no "Saved" badge.
+  await page.getByRole("button", { name: "Company details", exact: true }).click();
+  await page.getByLabel("Company Name", { exact: true }).fill("TEST Co A with a much longer name");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await acknowledge();
+  assert.equal(await page.getByText("Saved", { exact: true }).count(), 0);
+  await page.getByRole("button", { name: "Back to templates" }).click();
+
+  // The field editor: a new field does not fit, and "Unsaved changes" stays.
+  await page.getByRole("button", { name: /^TEST Form Last updated/ }).click();
+  await page.getByRole("button", { name: "Edit fields" }).click();
+  await waitForPdfPreview(page);
+  const canvas = await page.locator("canvas").first().boundingBox();
+  await page.mouse.move(canvas.x + 300, canvas.y + 600);
+  await page.mouse.down();
+  await page.mouse.move(canvas.x + 500, canvas.y + 640, { steps: 5 });
+  await page.mouse.up();
+  await page.getByRole("dialog").getByRole("textbox").fill("Extra Field");
+  await page.getByRole("dialog").getByRole("button", { name: "Add field" }).click();
+  await page.getByRole("button", { name: "Save template" }).click();
+  await acknowledge();
+  assert.equal(await page.getByText("Unsaved changes").count(), 1);
+
+  const [stored] = await readStoredTemplates(page);
+  assert.equal(stored.name, "TEST Form");
+  assert.equal(stored.employerFields[0].value, "TEST Co A");
+  assert.equal(stored.boxes.length, BOXES.length);
+  assert.deepEqual(pageErrors, []);
   await context.close();
 });
 

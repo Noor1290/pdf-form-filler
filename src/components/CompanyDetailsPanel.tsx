@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { CheckIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { SaveFailedDialog } from "@/components/SaveFailedDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,6 +34,7 @@ export function CompanyDetailsPanel({
     () => template.employerFields ?? null,
   );
   const [saved, setSaved] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [deletingField, setDeletingField] = useState<EmployerField | null>(
     null,
   );
@@ -98,7 +100,10 @@ export function CompanyDetailsPanel({
       const original = originalLabelsById.current.get(field.id);
       return original ? { ...field, label: original } : field;
     });
-    saveTemplateEmployerFields(template.id, cleaned);
+    if (!saveTemplateEmployerFields(template.id, cleaned)) {
+      setSaveFailed(true);
+      return;
+    }
     setFields(cleaned);
     originalLabelsById.current = new Map(
       cleaned.map((field) => [field.id, field.label]),
@@ -246,6 +251,11 @@ export function CompanyDetailsPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SaveFailedDialog
+        open={saveFailed}
+        onClose={() => setSaveFailed(false)}
+      />
     </div>
   );
 }

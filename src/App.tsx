@@ -5,6 +5,7 @@ import { CompanyDetailsPanel } from "@/components/CompanyDetailsPanel";
 import { DashboardDataNotice } from "@/components/DashboardDataNotice";
 import { FieldForm } from "@/components/FieldForm";
 import { NewTemplateFlow } from "@/components/NewTemplateFlow";
+import { SaveFailedDialog } from "@/components/SaveFailedDialog";
 import { TemplateList } from "@/components/TemplateList";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,9 @@ function App() {
   const [templates, setTemplates] = useState<Template[]>(() =>
     listTemplates(),
   );
+
+  // A rename or delete the browser refused to store (see SaveFailedDialog).
+  const [saveFailed, setSaveFailed] = useState(false);
 
   function refreshTemplates() {
     setTemplates(listTemplates());
@@ -202,11 +206,11 @@ function App() {
             onEditTemplate={(id) => setView({ name: "edit-boxes", id })}
             onCompanyDetails={(id) => setView({ name: "company-details", id })}
             onRenameTemplate={(id, name) => {
-              renameTemplate(id, name);
+              if (!renameTemplate(id, name)) setSaveFailed(true);
               refreshTemplates();
             }}
             onDeleteTemplate={(id) => {
-              deleteTemplate(id);
+              if (!deleteTemplate(id)) setSaveFailed(true);
               refreshTemplates();
             }}
           />
@@ -249,6 +253,11 @@ function App() {
           />
         )}
       </main>
+
+      <SaveFailedDialog
+        open={saveFailed}
+        onClose={() => setSaveFailed(false)}
+      />
     </div>
   );
 }
