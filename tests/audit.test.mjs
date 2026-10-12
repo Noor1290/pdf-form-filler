@@ -14,6 +14,7 @@ import { after, before, test } from "node:test";
 import { PDFDocument, StandardFonts, degrees } from "pdf-lib";
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import {
+  fillStorage,
   openFillScreen,
   peopleCount,
   readStoredTemplates,
@@ -139,35 +140,6 @@ async function download(page) {
   await page.getByRole("button", { name: "Download PDF" }).click();
   const file = await started;
   return { name: file.suggestedFilename(), bytes: fs.readFileSync(await file.path()) };
-}
-
-// Fills what is left of this site's storage, to the last character.
-async function fillStorage(page) {
-  return page.evaluate(() => {
-    let size = 1024 * 1024;
-    let i = 0;
-    while (size >= 1) {
-      try {
-        localStorage.setItem(`zz_test_fill_${i}`, "x".repeat(size));
-        i++;
-      } catch {
-        size = Math.floor(size / 2);
-      }
-    }
-    for (;;) {
-      try {
-        localStorage.setItem("zz_test_fill_0", `${localStorage.getItem("zz_test_fill_0")}x`);
-      } catch {
-        break;
-      }
-    }
-    let used = 0;
-    for (let k = 0; k < localStorage.length; k++) {
-      const key = localStorage.key(k);
-      used += key.length + localStorage.getItem(key).length;
-    }
-    return used;
-  });
 }
 
 // ------------------------------------------------------ reading a PDF back
@@ -805,6 +777,101 @@ test("when storage is full, the other saves say so too: field positions, company
   assert.equal(stored.employerFields[0].value, "TEST Co A");
   assert.equal(stored.boxes.length, BOXES.length);
   assert.deepEqual(pageErrors, []);
+  await context.close();
+});
+
+// ================================================ leaving the fill-in screen
+
+// Fixed (docs/KNOWN_ISSUES.md item 6). Typed values and the People list are
+// stored 0.4 seconds after the last change. Leaving inside that time used to
+// cancel the save that was waiting, so the last change was dropped unseen.
+// Nothing here waits between typing and leaving.
+test("what is typed in the last moment before leaving the fill-in screen is saved: Back to templates, Edit fields and a reload", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context, page, pageErrors } = await openApp([template(pdf, { entries: entriesFor(PEOPLE.slice(0, 2)) })]);
+  const storedNow = async () => (await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), STORAGE_KEY))[0];
+  const field = (name) => page.getByLabel(name, { exact: true });
+
+  // A new person's ID, then "Back to templates" at once.
+  await openFillScreen(page, "TEST Form");
+  await field("ID").fill("TST009");
+  await page.getByRole("button", { name: "Back to templates" }).click();
+  await page.getByText("Your templates").waitFor();
+  assert.equal((await storedNow()).values?.["b-id"], "TST009", "the ID typed just before Back to templates");
+  await openFillScreen(page, "TEST Form");
+  assert.equal(await field("ID").inputValue(), "TST009");
+
+  // A listed person's surname changed, then "Edit fields" at once: the
+  // People list is stored too, not only the form.
+  await page.getByRole("button", { name: "Person 2", exact: true }).click();
+  await readStoredTemplates(page); // gives the app time to save
+  await field("Surname").fill("LASTMOMENT");
+  await page.getByRole("button", { name: "Edit fields" }).click();
+  await page.getByRole("button", { name: "Save template" }).waitFor();
+  let stored = await storedNow();
+  assert.equal(stored.values["b-surname"], "LASTMOMENT", "the surname typed just before Edit fields");
+  assert.deepEqual(stored.entries.map((e) => [e.values["b-id"], e.values["b-surname"]]), [["TST001", "TESTER"], ["TST002", "LASTMOMENT"], ["TST009", undefined]]);
+
+  // A value typed, then the page reloaded at once.
+  await page.getByRole("button", { name: "Back to templates" }).click();
+  await openFillScreen(page, "TEST Form");
+  await readStoredTemplates(page);
+  await field("TAN").fill("TEST-TAN-9");
+  await page.reload();
+  await page.getByText("Your templates").waitFor();
+  stored = await storedNow();
+  assert.equal(stored.values["b-tan"], "TEST-TAN-9", "the TAN typed just before the reload");
+  assert.equal(stored.entries[1].values["b-tan"], "TEST-TAN-9", "and in the listed person it was typed for");
+  assert.deepEqual(pageErrors, []);
+  await context.close();
+});
+
+test("when storage is full, what is typed just before \"Back to templates\" is not dropped unseen: the NOT saved warning opens and the screen stays", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context, page, pageErrors } = await openApp([template(pdf)]);
+  await fillStorage(page);
+  await openFillScreen(page, "TEST Form");
+  await page.waitForTimeout(1200);
+  assert.equal(await page.getByRole("dialog").count(), 0);
+
+  await page.getByLabel("ID", { exact: true }).fill("TST009");
+  await page.getByRole("button", { name: "Back to templates" }).click();
+  const warning = page.getByRole("dialog");
+  await warning.getByText("This was NOT saved").waitFor();
+  assert.ok((await warning.textContent()).includes("you can still download the PDF now"), await warning.textContent());
+  await warning.getByRole("button", { name: "OK" }).click();
+  await warning.waitFor({ state: "hidden" });
+
+  // Still on the fill-in screen, marked as not saved, and still downloadable.
+  assert.equal(await page.getByLabel("ID", { exact: true }).inputValue(), "TST009");
+  assert.ok((await page.getByRole("alert").textContent()).startsWith("NOT saved."));
+  const pages = await readVisualText((await download(page)).bytes);
+  assert.deepEqual(pages.map((p) => p.items.find((i) => /^TST\d/.test(i.text))?.text), ["TST009"]);
+
+  // Having been told, leaving is not held back a second time.
+  await page.getByRole("button", { name: "Back to templates" }).click();
+  await page.getByText("Your templates").waitFor();
+  assert.equal(await page.getByRole("dialog").count(), 0);
+  const [stored] = await readStoredTemplates(page);
+  assert.equal(stored.values?.["b-id"], undefined, "nothing was stored, as the screen said");
+  assert.deepEqual(pageErrors, []);
+  await context.close();
+});
+
+test("when storage is full, reloading the page in that last moment is held by the browser's own question, and the NOT saved warning is there on staying", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context, page } = await openApp([template(pdf)]);
+  await fillStorage(page);
+  await openFillScreen(page, "TEST Form");
+  await page.waitForTimeout(1200);
+
+  await page.getByLabel("ID", { exact: true }).fill("TST009");
+  // The browser asks whether to leave; the answer here is to stay.
+  const asked = new Promise((resolve) => page.once("dialog", (question) => question.dismiss().then(() => resolve(question.type()))));
+  await page.evaluate(() => setTimeout(() => location.reload(), 0));
+  assert.equal(await asked, "beforeunload");
+  await page.getByRole("dialog").getByText("This was NOT saved").waitFor();
+  assert.equal(await page.locator("#field-b-id").inputValue(), "TST009");
   await context.close();
 });
 

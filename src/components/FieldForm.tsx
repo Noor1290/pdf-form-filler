@@ -300,27 +300,63 @@ export function FieldForm({
 
   // The blocking warning opens when a save is first refused, not again on
   // every key typed after that; the notice on the screen stays until a save
-  // works.
-  function recordSaves(after: { values: boolean; entries: boolean }) {
+  // works. Says whether the warning was opened just now.
+  function recordSaves(after: { values: boolean; entries: boolean }): boolean {
     const before = unsavedNow.current;
     unsavedNow.current = after;
     setUnsaved(after);
     const wasSaved = !before.values && !before.entries;
-    if (wasSaved && (after.values || after.entries)) {
-      setSaveFailure("form-and-people");
-    }
+    const justRefused = wasSaved && (after.values || after.entries);
+    if (justRefused) setSaveFailure("form-and-people");
+    return justRefused;
+  }
+
+  // What the two delayed saves below have not stored yet. Kept apart from
+  // their timers so that leaving the screen can store it at once: a timer
+  // that is cancelled must not take the last change with it.
+  const waitingToSave = useRef<{
+    values?: Record<string, string>;
+    entries?: TemplateEntry[];
+  }>({});
+
+  function saveWaitingValues(templateId: string): boolean {
+    const waiting = waitingToSave.current.values;
+    if (waiting === undefined) return false;
+    waitingToSave.current.values = undefined;
+    const saved =
+      saveTemplateValues(templateId, waiting) ||
+      waiting === valuesOnOpening.current;
+    return recordSaves({ ...unsavedNow.current, values: !saved });
+  }
+
+  function saveWaitingEntries(templateId: string): boolean {
+    const waiting = waitingToSave.current.entries;
+    if (waiting === undefined) return false;
+    waitingToSave.current.entries = undefined;
+    const saved =
+      saveTemplateEntries(templateId, waiting) ||
+      waiting === entriesOnOpening.current;
+    return recordSaves({ ...unsavedNow.current, entries: !saved });
+  }
+
+  // Stores at once whatever is still waiting. Says whether the "NOT saved"
+  // warning was opened by it, that is, the browser refused and this is the
+  // first the user hears of it.
+  function saveWhatIsWaiting(templateId: string): boolean {
+    const valuesJustRefused = saveWaitingValues(templateId);
+    const entriesJustRefused = saveWaitingEntries(templateId);
+    return valuesJustRefused || entriesJustRefused;
   }
 
   // Persist values with the template so leaving and coming back shows what
   // was last typed, not a blank form — debounced the same way as the
   // preview redraw so fast typing doesn't hit localStorage on every key.
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      const saved =
-        saveTemplateValues(template.id, values) ||
-        values === valuesOnOpening.current;
-      recordSaves({ ...unsavedNow.current, values: !saved });
-    }, VALUES_SAVE_DEBOUNCE_MS);
+    waitingToSave.current.values = values;
+    const timeout = setTimeout(
+      () => saveWaitingValues(template.id),
+      VALUES_SAVE_DEBOUNCE_MS,
+    );
 
     return () => clearTimeout(timeout);
   }, [template.id, values]);
@@ -329,15 +365,43 @@ export function FieldForm({
   // adding several people and coming back restores the full list, not just
   // whatever was last typed into the form.
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      const saved =
-        saveTemplateEntries(template.id, entries) ||
-        entries === entriesOnOpening.current;
-      recordSaves({ ...unsavedNow.current, entries: !saved });
-    }, ENTRIES_SAVE_DEBOUNCE_MS);
+    waitingToSave.current.entries = entries;
+    const timeout = setTimeout(
+      () => saveWaitingEntries(template.id),
+      ENTRIES_SAVE_DEBOUNCE_MS,
+    );
 
     return () => clearTimeout(timeout);
   }, [template.id, entries]);
+
+  // Whatever the delayed saves were still waiting to store is stored when
+  // the page is closed or reloaded, and when this screen closes by any
+  // route. A refusal the user has not been told about holds the page: the
+  // browser asks before leaving, and the warning is there on staying.
+  useEffect(() => {
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (saveWhatIsWaiting(template.id)) event.preventDefault();
+    }
+    function handlePageHide() {
+      saveWhatIsWaiting(template.id);
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
+      saveWhatIsWaiting(template.id);
+    };
+  }, [template.id]);
+
+  // "Back to templates" and "Edit fields" store what is waiting first. If
+  // the browser refuses and the user is only now being told, they stay here
+  // with the warning: on this screen the PDF can still be downloaded, and
+  // leaving is what would lose it. Once told, leaving is not held back.
+  function leaveScreen(goThere: () => void) {
+    const justRefused = saveWhatIsWaiting(template.id);
+    if (!justRefused) goThere();
+  }
 
   function handleRetrySave() {
     const valuesSaved = saveTemplateValues(template.id, values);
@@ -623,7 +687,7 @@ export function FieldForm({
               </>
             )}
           </Button>
-          <Button variant="outline" onClick={onEditFields}>
+          <Button variant="outline" onClick={() => leaveScreen(onEditFields)}>
             Edit fields
           </Button>
           {boxes.length > 0 && (
@@ -634,7 +698,7 @@ export function FieldForm({
               Clear values
             </Button>
           )}
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={() => leaveScreen(onBack)}>
             Back to templates
           </Button>
         </div>
@@ -667,7 +731,7 @@ export function FieldForm({
           <p className="text-muted">
             This template doesn't have any fields yet.
           </p>
-          <Button onClick={onEditFields}>Add fields</Button>
+          <Button onClick={() => leaveScreen(onEditFields)}>Add fields</Button>
         </div>
       ) : (
         <div className="flex w-full flex-col items-start gap-5 xl:flex-row xl:justify-between">

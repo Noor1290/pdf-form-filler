@@ -69,30 +69,10 @@ while the file is made, and the Save buttons read "Saving…" for a moment. Both
 are too brief to record reliably, so those two strings are not covered by the
 check. They are unchanged in the code.
 
-## 6. Something typed in the last moment before leaving the fill-in screen is not saved
+## 6. (Fixed) Something typed in the last moment before leaving the fill-in screen was not saved
 
-**Priority: to be decided.** Found while fixing the audit's items; not part
-of them, so not fixed. It was already so before those fixes.
-
-**Where:** fill-in screen.
-
-**What happens:** typed values and the People list are saved about 0.4
-seconds after the last change. Pressing "Back to templates" or "Edit fields"
-inside that 0.4 seconds cancels the save that was waiting, so the last change
-is not stored. Nothing warns.
-
-**How to reproduce:** open a template, type into a field and press "Back to
-templates" straight away. Open the template again: the field is empty.
-
-**Evidence** (fake data, a template with one field called "ID"):
-
-| Typed | Wait before "Back to templates" | Stored for the field |
-| --- | --- | --- |
-| TST001 | none | nothing |
-| TST001 | 1 second | TST001 |
-
-**Where in the code:** the two delayed saves in src/components/FieldForm.tsx
-cancel their timer when the screen closes instead of saving first.
+Fixed after the audit; see "Fixed after the audit" at the end of this file.
+The number is kept so later items keep theirs.
 
 # Fixed during the redesign
 
@@ -195,3 +175,35 @@ of failing silently.
 
 Not changed: the PDFs themselves are still kept in this storage, which is
 what fills it (see the audit report, risk R2).
+
+## Something typed in the last moment before leaving the fill-in screen was not saved (was item 6)
+
+Typed values and the People list are stored about 0.4 seconds after the last
+change. Pressing "Back to templates" or "Edit fields", or closing or
+reloading the page, inside that time used to cancel the save that was
+waiting, so the last change was dropped and nothing warned.
+
+Evidence before the fix (fake data, a template with one field called "ID"):
+
+| Typed | Wait before "Back to templates" | Stored for the field |
+| --- | --- | --- |
+| TST001 | none | nothing |
+| TST001 | 1 second | TST001 |
+
+**Now:** whatever is still waiting is stored first, on "Back to templates",
+"Edit fields" (and "Add fields"), and when the page is closed or reloaded.
+
+When the browser refuses that save (its storage is full) and the screen was
+not already marked "NOT saved":
+
+- "Back to templates" and "Edit fields" stay on the screen and open the same
+  "This was NOT saved" warning, so the PDF can still be downloaded. Pressed
+  again after the warning, they leave as before.
+- On closing or reloading the page, the browser asks its own "leave this
+  page?" question, and the warning is there if the answer is to stay. The
+  wording of that question is the browser's, not this tool's.
+
+**Tests:** three in `tests/audit.test.mjs`, under "leaving the fill-in
+screen". All three fail without the fix.
+
+**What changed:** src/components/FieldForm.tsx only. No wording was added.
