@@ -6,7 +6,20 @@
     "title: Switch to dark theme",
     "aria-label: Name this field",
     "aria-label: Rename field",
-    "aria-label: Rename template"
+    "aria-label: Rename template",
+    "text: This was NOT saved",
+    "text: The browser's storage for this tool is full, so your last change could not be saved.",
+    "text: To make room, delete a template you no longer need, then make the change again.",
+    "text: What you see on this screen is still here, and you can still download the PDF now, but it will be gone when this page is closed or reloaded. To make room, open this tool in another browser tab and delete a template you no longer need there, then come back here and press \"Try saving again\".",
+    "text: OK",
+    "text: NOT saved.",
+    "text: NOT saved. The browser's storage for this tool is full, so what you see on this screen is not saved. It will be gone when this page is closed or reloaded. You can still download the PDF now.",
+    "text: Try saving again",
+    "text: Not saved",
+    "text: Some characters could not be printed",
+    "text: Your PDF was downloaded, but the fonts this tool can use do not have every character. Each one listed here was replaced with \"?\" in the PDF (a line break or tab with a space). Please check these before you use it.",
+    "text: Person 1, Surname: ń line break or tab",
+    "text: The person in the form (not in the list yet), Surname: Ł"
   ],
   "removed": []
 }

@@ -3,7 +3,9 @@
 // and the accessibility check (which measures contrast at each stop).
 import {
   STANDIN_URL,
+  fillStorage,
   openFillScreen,
+  readStoredTemplates,
   reloadApp,
   seedTemplates,
   waitForPdfPreview,
@@ -219,6 +221,43 @@ export async function walkThrough(app, visit) {
   await choose("no-match.csv", "Department,Email\nTesting,nobody@example.test\n");
   await snap(page, "import preview: no matching columns");
   await inDialog(page, "Cancel");
+  await closed(page);
+
+  // Characters the PDF fonts cannot print: one in a listed person, one in
+  // the person still in the form, and a tab.
+  await page.getByRole("button", { name: "Person 1", exact: true }).click();
+  await page.getByLabel("Surname", { exact: true }).fill("Wroński\tTest");
+  await page.getByRole("button", { name: "Add & fill next person" }).click();
+  await page.getByLabel("Surname", { exact: true }).fill("Łukasz");
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download PDF" }).click();
+  await downloaded;
+  await dialog(page).getByText("Some characters could not be printed").waitFor();
+  await snap(page, "fill-in: some characters could not be printed");
+  await inDialog(page, "OK");
+  await closed(page);
+
+  // The browser's storage full: a change that cannot be stored.
+  await page.getByLabel("Surname", { exact: true }).fill("");
+  await page.getByRole("button", { name: "Person 2", exact: true }).click();
+  await readStoredTemplates(page); // gives the app time to save
+  await fillStorage(page);
+  await page.getByLabel("Surname", { exact: true }).fill("Sampleton-Placeholder");
+  await dialog(page).getByText("This was NOT saved").waitFor();
+  await snap(page, "fill-in: NOT saved warning");
+  await inDialog(page, "OK");
+  await closed(page);
+  await page.getByText("Not saved", { exact: true }).waitFor();
+  await snap(page, "fill-in: marked NOT saved");
+  await page.getByRole("button", { name: "Back to templates" }).click();
+  await row(page, "Fake Form").getByRole("button", { name: "Rename" }).click();
+  await dialog(page).getByRole("textbox").fill("Fake Form with a much longer name");
+  await inDialog(page, "Save");
+  await dialog(page).getByText("This was NOT saved").waitFor();
+  // The rename dialog is still fading out behind the warning for a moment.
+  await page.locator('input[aria-label="Rename template"]').waitFor({ state: "detached" });
+  await snap(page, "home: NOT saved warning");
+  await inDialog(page, "OK");
   await closed(page);
   await context.close();
 

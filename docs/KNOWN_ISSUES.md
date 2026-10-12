@@ -74,6 +74,28 @@ check. They are unchanged in the code.
 Fixed after the audit; see "Fixed after the audit" at the end of this file.
 The number is kept so later items keep theirs.
 
+## 7. A rename dialog reads 'Choose a new name for "".' while it fades out (cosmetic)
+
+**Priority: to be decided.** Found while extending the visible-text check;
+not part of that task, so not fixed.
+
+**Where:** "Rename template" on the home screen and "Rename field" in the
+field editor.
+
+**What happens:** the dialog's first line is 'Choose a new name for
+"Fake Form".' When the dialog closes (Save, Cancel or Escape), the name is
+forgotten at once but the dialog takes a moment to fade out, so for that
+moment the line reads 'Choose a new name for "".'
+
+**Evidence** (fake data): with the rename dialog closed by Save,
+`npm run check:text` recorded `Choose a new name for "".` on the screen
+behind the "This was NOT saved" warning. The walkthrough now waits for the
+rename dialog to be gone before recording that screen.
+
+**Where in the code:** src/components/TemplateList.tsx and
+src/components/BoxEditor.tsx read the name from the same state that closes
+the dialog.
+
 # Fixed during the redesign
 
 Small behaviour changes made on purpose, each approved, because the redesign's
