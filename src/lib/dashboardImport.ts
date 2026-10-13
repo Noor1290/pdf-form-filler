@@ -15,6 +15,7 @@ import {
   MAX_PDF_BYTES,
   askHub,
   base64Bytes,
+  sameJson,
   sendHub,
 } from "@/lib/hubWire";
 import { listTemplates as listBrowserTemplates } from "@/lib/template";
@@ -174,7 +175,7 @@ export async function importOne(
   const same =
     row.name === name &&
     row.pdf_sha256 === described.sha256 &&
-    JSON.stringify(row.body) === JSON.stringify(body);
+    sameJson(row.body, body);
   if (!same) {
     return no(
       "What the dashboard stored is not the same as this browser's copy. This browser's copy is still the one to use.",

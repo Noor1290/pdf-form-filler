@@ -11,6 +11,7 @@ import {
   askHub,
   base64Bytes,
   base64ToBytes,
+  sameJson,
   sendHub,
   sha256Hex,
 } from "@/lib/hubWire";
@@ -428,8 +429,8 @@ async function saveOnce(item: Held): Promise<{ ok: true } | HubFailure> {
   }
   const row = now.rows[0];
   if (!row) return sent;
-  const theirs = JSON.stringify({ name: row.name, body: row.body });
-  if (row.revision > expected && theirs === text) {
+  const theirsIsMine = sameJson({ name: row.name, body: row.body }, sending);
+  if (row.revision > expected && theirsIsMine) {
     item.revision = row.revision;
     item.saved = text;
     return { ok: true };

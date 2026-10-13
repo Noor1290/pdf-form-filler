@@ -34,6 +34,15 @@ export function createFakeHub(seed) {
     mostSavesAtOnce: 0,
   };
 
+  // What a database does to stored JSON: an object's properties come back in its own order
+  // (shorter names first, then by alphabet), not the order they were sent in.
+  const asStored = (value) => {
+    if (Array.isArray(value)) return value.map(asStored);
+    if (value === null || typeof value !== "object") return value;
+    const keys = Object.keys(value).sort((a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0));
+    return Object.fromEntries(keys.map((key) => [key, asStored(value[key])]));
+  };
+
   const refuse = (code, error) => ({ ok: false, code, error });
   const meta = () => ({ label: state.label, brn: state.brn, role: state.role });
   const sameBrn = (brn) => String(brn).trim().toUpperCase() === state.brn.toUpperCase();
@@ -120,7 +129,7 @@ export function createFakeHub(seed) {
       template_id: row.template_id,
       name: row.name,
       revision: (existing ? existing.revision : 0) + 1,
-      body: state.corruptNextSave ? { ...row.body, boxes: [] , changedByFaultyStore: true } : row.body,
+      body: asStored(state.corruptNextSave ? { ...row.body, boxes: [], changedByFaultyStore: true } : row.body),
       pdf_sha256: row.pdf_sha256,
       pdf_file_name: row.pdf_file_name,
       pdf_bytes: row.pdf_bytes,
