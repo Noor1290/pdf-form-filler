@@ -3,7 +3,9 @@
 // and the accessibility check (which measures contrast at each stop).
 import {
   STANDIN_URL,
+  fillStorage,
   openFillScreen,
+  readStoredTemplates,
   reloadApp,
   seedTemplates,
   waitForPdfPreview,
@@ -220,6 +222,104 @@ export async function walkThrough(app, visit) {
   await snap(page, "import preview: no matching columns");
   await inDialog(page, "Cancel");
   await closed(page);
+
+  // Characters the PDF fonts cannot print: one in a listed person, one in
+  // the person still in the form, and a tab.
+  await page.getByRole("button", { name: "Person 1", exact: true }).click();
+  await page.getByLabel("Surname", { exact: true }).fill("Wroński\tTest");
+  await page.getByRole("button", { name: "Add & fill next person" }).click();
+  await page.getByLabel("Surname", { exact: true }).fill("Łukasz");
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download PDF" }).click();
+  await downloaded;
+  await dialog(page).getByText("Some characters could not be printed").waitFor();
+  await snap(page, "fill-in: some characters could not be printed");
+  await inDialog(page, "OK");
+  await closed(page);
+
+  // The browser's storage full: a change that cannot be stored.
+  await page.getByLabel("Surname", { exact: true }).fill("");
+  await page.getByRole("button", { name: "Person 2", exact: true }).click();
+  await readStoredTemplates(page); // gives the app time to save
+  await fillStorage(page);
+  await page.getByLabel("Surname", { exact: true }).fill("Sampleton-Placeholder");
+  await dialog(page).getByText("This was NOT saved").waitFor();
+  await snap(page, "fill-in: NOT saved warning");
+  await inDialog(page, "OK");
+  await closed(page);
+  await page.getByText("Not saved", { exact: true }).waitFor();
+  await snap(page, "fill-in: marked NOT saved");
+  await page.getByRole("button", { name: "Back to templates" }).click();
+  await row(page, "Fake Form").getByRole("button", { name: "Rename" }).click();
+  await dialog(page).getByRole("textbox").fill("Fake Form with a much longer name");
+  await inDialog(page, "Save");
+  await dialog(page).getByText("This was NOT saved").waitFor();
+  // The rename dialog is still fading out behind the warning for a moment.
+  await page.locator('input[aria-label="Rename template"]').waitFor({ state: "detached" });
+  await snap(page, "home: NOT saved warning");
+  await inDialog(page, "OK");
+  await closed(page);
+
+  // Back up and Restore. The storage is still full here, so the first
+  // restore is refused; then room is made and it goes through.
+  const backupFile = (content) => ({
+    name: "pdf-form-filler-backup-2026-10-13.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(typeof content === "string" ? content : JSON.stringify(content)),
+  });
+  const people = (count) =>
+    Array.from({ length: count }, (_, index) => ({
+      id: `entry-${index + 1}`,
+      values: { "f-surname": `Sampleton ${index + 1}`, "f-other": "Fake Person" },
+    }));
+  const fakeBackup = {
+    _meta: { app: "pdf-form-filler-backup", version: 1, exportedAt: "2026-10-13T08:05:00.000Z" },
+    stored: {
+      "pdf-editor:templates": [
+        makeTemplate(pdf, { employerFields: COMPANY_DETAILS, entries: people(400) }),
+        makeTemplate(pdf, { id: "tpl-one-field", name: "One Field Form", boxes: [makeTemplate(pdf).boxes[0]], entries: people(1) }),
+      ],
+      "pdf-editor:employer-fields": COMPANY_DETAILS,
+    },
+    unreadable: { "pdf-editor:employer-profile": '{"companyName":' },
+  };
+  const chooseBackup = (content) =>
+    page.locator('input[type="file"][accept=".json,application/json"]').setInputFiles(backupFile(content));
+
+  await chooseBackup(fakeBackup);
+  await dialog(page).getByText("Restore this backup?").waitFor();
+  await snap(page, "restore: what is in the file and in the browser");
+  await inDialog(page, "Replace with this backup");
+  await dialog(page).getByText("The backup was NOT restored").waitFor();
+  await snap(page, "restore: NOT restored, storage full");
+  await inDialog(page, "OK");
+  await closed(page);
+
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("zz_test_fill_")) localStorage.removeItem(key);
+    }
+  });
+  await chooseBackup("just some notes, not a backup");
+  await dialog(page).getByText("This file cannot be restored").waitFor();
+  await snap(page, "restore: a file that is not a backup");
+  await inDialog(page, "OK");
+  await closed(page);
+
+  await chooseBackup({ ...fakeBackup, _meta: { ...fakeBackup._meta, version: 2 } });
+  await dialog(page).getByText("This file cannot be restored").waitFor();
+  await snap(page, "restore: a backup of another version");
+  await inDialog(page, "OK");
+  await closed(page);
+
+  await chooseBackup(fakeBackup);
+  await dialog(page).getByText("Restore this backup?").waitFor();
+  await inDialog(page, "Replace with this backup");
+  await dialog(page).getByText("Backup restored").waitFor();
+  await snap(page, "restore: backup restored");
+  await inDialog(page, "OK");
+  await closed(page);
+  await row(page, "One Field Form").waitFor();
   await context.close();
 
   // ---------------- inside the stand-in dashboard ----------------

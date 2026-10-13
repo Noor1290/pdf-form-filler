@@ -9,6 +9,12 @@ lerna-debug.log*
 
 node_modules
 dist
+
+# Backup files ("Back up" in the tool) hold people's details: never commit one.
+pdf-form-filler-backup-*.json
+payroll-backup-*.json
+*-backup-*.json
+
 dist-ssr
 *.local
 

@@ -111,21 +111,68 @@ function hexToRgbColor(hex: string) {
   return rgb(r, g, b);
 }
 
+// A value that could not be printed exactly as typed: which entry (its
+// position in the list handed to exportFilledPdf), which box, and the
+// characters that were replaced.
+export type ReplacedCharacters = {
+  entryIndex: number;
+  boxName: string;
+  characters: string[];
+};
+
+const UNPRINTABLE_REPLACEMENT = "?";
+const printableCodePoints = new WeakMap<PDFFont, Set<number>>();
+
+// The standard fonts only cover Western European characters, and pdf-lib
+// refuses a whole text over a single character outside that set. Each such
+// character is swapped for "?" (a line break or tab for a space) so the
+// rest of the value, and everyone else's page, is still printed; what was
+// replaced is handed back so the caller can say so.
+function makePrintable(
+  value: string,
+  font: PDFFont,
+): { text: string; replaced: string[] } {
+  let printable = printableCodePoints.get(font);
+  if (!printable) {
+    printable = new Set(font.getCharacterSet());
+    printableCodePoints.set(font, printable);
+  }
+
+  let text = "";
+  const replaced: string[] = [];
+  for (const character of value) {
+    if (printable.has(character.codePointAt(0) ?? -1)) {
+      text += character;
+      continue;
+    }
+    text += /\s/.test(character) ? " " : UNPRINTABLE_REPLACEMENT;
+    if (!replaced.includes(character)) replaced.push(character);
+  }
+  return { text, replaced };
+}
+
 // Draws one entry's values onto a single (already-copied) page, matching
 // each box's position/font/alignment — shared by every page produced by
-// exportFilledPdf below.
+// exportFilledPdf below. Returns the boxes whose value had characters the
+// font cannot print (see makePrintable).
 async function drawValuesOnPage(
   page: PDFPage,
   boxes: FieldBox[],
   values: Record<string, string>,
   getFont: (box: FieldBox) => Promise<PDFFont>,
-): Promise<void> {
+): Promise<{ boxName: string; characters: string[] }[]> {
+  const replacedInBoxes: { boxName: string; characters: string[] }[] = [];
+
   for (const box of boxes) {
     const value = values[box.id];
     if (!value) continue;
 
     const font = await getFont(box);
-    const textWidth = font.widthOfTextAtSize(value, box.fontSize);
+    const { text, replaced } = makePrintable(value, font);
+    if (replaced.length > 0) {
+      replacedInBoxes.push({ boxName: box.name, characters: replaced });
+    }
+    const textWidth = font.widthOfTextAtSize(text, box.fontSize);
 
     // Anchor point in VISUAL space first (top-left origin, y-down — same
     // convention box.x/box.y are stored in; see BoxEditor).
@@ -142,7 +189,7 @@ async function drawValuesOnPage(
 
     const { x, y } = visualPointToContentSpace(page, visualX, visualY);
 
-    page.drawText(value, {
+    page.drawText(text, {
       x,
       y,
       size: box.fontSize,
@@ -155,6 +202,8 @@ async function drawValuesOnPage(
       rotate: degrees(page.getRotation().angle),
     });
   }
+
+  return replacedInBoxes;
 }
 
 // Bakes one filled set of values per entry into the original PDF, matching
@@ -163,10 +212,13 @@ async function drawValuesOnPage(
 // order, so filling in several people produces one multi-page PDF rather
 // than one download per person. A single entry behaves exactly like the
 // original single-person export (same page count, nothing extra).
+// `onReplaced` is told about every value that could not be printed exactly
+// as typed (see makePrintable); the download is finished either way.
 export async function exportFilledPdf(
   pdfData: string,
   boxes: FieldBox[],
   entriesValues: Record<string, string>[],
+  onReplaced?: (replaced: ReplacedCharacters) => void,
 ): Promise<Uint8Array> {
   // Some source PDFs carry owner-level restrictions (no open password, but
   // pdf-lib refuses to load them by default) — safe to ignore here since we
@@ -200,7 +252,7 @@ export async function exportFilledPdf(
     else boxesByPage.set(box.page, [box]);
   }
 
-  for (const entryValues of entriesValues) {
+  for (const [entryIndex, entryValues] of entriesValues.entries()) {
     const copiedPages = await outputDoc.copyPages(
       sourceDoc,
       sourcePageIndices,
@@ -210,7 +262,15 @@ export async function exportFilledPdf(
       outputDoc.addPage(page);
       const pageBoxes = boxesByPage.get(pageIndex + 1);
       if (!pageBoxes) continue;
-      await drawValuesOnPage(page, pageBoxes, entryValues, getFont);
+      const replacedOnPage = await drawValuesOnPage(
+        page,
+        pageBoxes,
+        entryValues,
+        getFont,
+      );
+      for (const found of replacedOnPage) {
+        onReplaced?.({ entryIndex, ...found });
+      }
     }
   }
 

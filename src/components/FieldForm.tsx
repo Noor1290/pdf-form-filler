@@ -15,6 +15,7 @@ import {
 import { Rnd } from "react-rnd";
 import { BoxStyleDialog } from "@/components/BoxStyleDialog";
 import { ImportEntriesDialog } from "@/components/ImportEntriesDialog";
+import { SaveFailedDialog } from "@/components/SaveFailedDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,14 +39,11 @@ import {
   getPageSize,
   loadPdfDocument,
   renderPdfPageToCanvas,
+  type ReplacedCharacters,
 } from "@/lib/pdf";
 import type { DashboardPayroll } from "@/lib/payrollHub";
 import { resizeHandleStyles } from "@/lib/rndHandleStyles";
-import {
-  saveTemplateBoxes,
-  saveTemplateEntries,
-  saveTemplateValues,
-} from "@/lib/template";
+import { templateStore } from "@/lib/templateStore";
 import { validateFieldValue } from "@/lib/validation";
 import type {
   EmployerField,
@@ -53,6 +51,9 @@ import type {
   Template,
   TemplateEntry,
 } from "@/types/template";
+
+const { saveTemplateBoxes, saveTemplateEntries, saveTemplateValues } =
+  templateStore;
 
 type FieldFormProps = {
   template: Template;
@@ -98,6 +99,42 @@ function computeEmployerAutofill(
   return result;
 }
 
+// Whether two sets of values put the same text in every field. A field that
+// was never touched counts the same as one that was emptied again.
+function sameValues(
+  a: Record<string, string>,
+  b: Record<string, string>,
+): boolean {
+  const boxIds = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const boxId of boxIds) {
+    if ((a[boxId] ?? "") !== (b[boxId] ?? "")) return false;
+  }
+  return true;
+}
+
+function hasAnyValue(values: Record<string, string>): boolean {
+  return Object.values(values).some((value) => value !== "");
+}
+
+// The form is saved as plain values, without saying whose they are. When
+// they are exactly a listed person's, the form was showing that person when
+// the screen was left, and it is that person again on coming back: treating
+// them as someone new put the same person in the download twice.
+function findEntryShownInForm(template: Template): TemplateEntry | undefined {
+  const savedValues = template.values ?? {};
+  if (!hasAnyValue(savedValues)) return undefined;
+  return (template.entries ?? []).findLast((entry) =>
+    sameValues(entry.values, savedValues),
+  );
+}
+
+// One line of the "could not be printed" list shown after a download.
+type UnprintedValue = {
+  person: string | null; // null when the download is the form alone
+  boxName: string;
+  characters: string[];
+};
+
 export function FieldForm({
   template,
   onBack,
@@ -117,13 +154,23 @@ export function FieldForm({
     width: number;
     height: number;
   } | null>(null);
+  // The listed person the form was left showing, if any (see
+  // findEntryShownInForm). Worked out once, when the screen opens.
+  const [entryShownOnOpening] = useState(() => findEntryShownInForm(template));
   // Start from employer autofill, then let whatever was last saved for this
   // template (see roadmap Step 7) win — a saved value always wins, so
-  // autofill never overwrites something the user actually typed.
-  const [values, setValues] = useState<Record<string, string>>(() => ({
-    ...computeEmployerAutofill(template.boxes, template.employerFields ?? []),
-    ...(template.values ?? {}),
-  }));
+  // autofill never overwrites something the user actually typed. A listed
+  // person's values are shown as they are, the same as after clicking them.
+  const [values, setValues] = useState<Record<string, string>>(
+    () =>
+      entryShownOnOpening?.values ?? {
+        ...computeEmployerAutofill(
+          template.boxes,
+          template.employerFields ?? [],
+        ),
+        ...(template.values ?? {}),
+      },
+  );
 
   // Entries hold one filled-in person each, for exporting everyone as a
   // single multi-page PDF (see roadmap). `values` above always represents
@@ -134,7 +181,9 @@ export function FieldForm({
   const [entries, setEntries] = useState<TemplateEntry[]>(
     () => template.entries ?? [],
   );
-  const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  const [activeEntryId, setActiveEntryId] = useState<string | null>(
+    entryShownOnOpening?.id ?? null,
+  );
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
   const [confirmingClearEntries, setConfirmingClearEntries] = useState(false);
 
@@ -147,6 +196,26 @@ export function FieldForm({
   const [exporting, setExporting] = useState(false);
   const [editingBoxId, setEditingBoxId] = useState<string | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
+
+  // Which parts of this screen the browser refused to store (its storage
+  // for this site is full). While either is set the screen says "NOT
+  // saved": what is shown must never pass for saved when it is not.
+  const [unsaved, setUnsaved] = useState({ values: false, entries: false });
+  const notSaved = unsaved.values || unsaved.entries;
+  // The same, readable from the delayed saves below without waiting for the
+  // next render.
+  const unsavedNow = useRef(unsaved);
+  const [saveFailure, setSaveFailure] = useState<
+    "form-and-people" | "positions" | null
+  >(null);
+  // Opening the screen stores it again exactly as it was found. If that is
+  // refused, nothing the user did is lost, so it is not reported.
+  const valuesOnOpening = useRef(values);
+  const entriesOnOpening = useRef(entries);
+  // Shown after a download in which some characters could not be printed.
+  const [unprintedValues, setUnprintedValues] = useState<
+    UnprintedValue[] | null
+  >(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,13 +297,89 @@ export function FieldForm({
     return () => clearTimeout(timeout);
   }, [values, boxes, canvasSize, pointToPixelRect, pointsToPixels]);
 
+  // The blocking warning opens when a save is first refused, not again on
+  // every key typed after that; the notice on the screen stays until a save
+  // works. Says whether the warning was opened just now.
+  function recordSaves(after: { values: boolean; entries: boolean }): boolean {
+    const before = unsavedNow.current;
+    unsavedNow.current = after;
+    setUnsaved(after);
+    const wasSaved = !before.values && !before.entries;
+    const justRefused = wasSaved && (after.values || after.entries);
+    if (justRefused) setSaveFailure("form-and-people");
+    return justRefused;
+  }
+
+  // What the two delayed saves below have not stored yet. Kept apart from
+  // their timers so that leaving the screen can store it at once: a timer
+  // that is cancelled must not take the last change with it.
+  const waitingToSave = useRef<{
+    values?: Record<string, string>;
+    entries?: TemplateEntry[];
+  }>({});
+
+  function saveWaitingValues(templateId: string): boolean {
+    const waiting = waitingToSave.current.values;
+    if (waiting === undefined) return false;
+    waitingToSave.current.values = undefined;
+    const saved =
+      saveTemplateValues(templateId, waiting) ||
+      waiting === valuesOnOpening.current;
+    return recordSaves({ ...unsavedNow.current, values: !saved });
+  }
+
+  function saveWaitingEntries(templateId: string): boolean {
+    const waiting = waitingToSave.current.entries;
+    if (waiting === undefined) return false;
+    waitingToSave.current.entries = undefined;
+    const saved =
+      saveTemplateEntries(templateId, waiting) ||
+      waiting === entriesOnOpening.current;
+    return recordSaves({ ...unsavedNow.current, entries: !saved });
+  }
+
+  // The People list as last drawn, for the moments below that run outside a
+  // render (leaving the screen, closing the page).
+  const listNow = useRef({ entries, activeEntryId });
+  useEffect(() => {
+    listNow.current = { entries, activeEntryId };
+  }, [entries, activeEntryId]);
+
+  // A value typed for a listed person reaches the form at once and the
+  // People list one redraw later (the background backstop further down).
+  // Leaving in between must not store that person without the last key, so
+  // the list is brought level with the form first.
+  function bringPeopleListLevel() {
+    const typed = waitingToSave.current.values;
+    const { entries: drawn, activeEntryId: activeId } = listNow.current;
+    if (typed === undefined || activeId === null) return;
+    const list = waitingToSave.current.entries ?? drawn;
+    const active = list.find((entry) => entry.id === activeId);
+    if (!active || sameValues(active.values, typed)) return;
+    waitingToSave.current.entries = list.map((entry) =>
+      entry.id === activeId ? { ...entry, values: typed } : entry,
+    );
+  }
+
+  // Stores at once whatever is still waiting. Says whether the "NOT saved"
+  // warning was opened by it, that is, the browser refused and this is the
+  // first the user hears of it.
+  function saveWhatIsWaiting(templateId: string): boolean {
+    bringPeopleListLevel();
+    const valuesJustRefused = saveWaitingValues(templateId);
+    const entriesJustRefused = saveWaitingEntries(templateId);
+    return valuesJustRefused || entriesJustRefused;
+  }
+
   // Persist values with the template so leaving and coming back shows what
   // was last typed, not a blank form — debounced the same way as the
   // preview redraw so fast typing doesn't hit localStorage on every key.
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      saveTemplateValues(template.id, values);
-    }, VALUES_SAVE_DEBOUNCE_MS);
+    waitingToSave.current.values = values;
+    const timeout = setTimeout(
+      () => saveWaitingValues(template.id),
+      VALUES_SAVE_DEBOUNCE_MS,
+    );
 
     return () => clearTimeout(timeout);
   }, [template.id, values]);
@@ -243,12 +388,51 @@ export function FieldForm({
   // adding several people and coming back restores the full list, not just
   // whatever was last typed into the form.
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      saveTemplateEntries(template.id, entries);
-    }, ENTRIES_SAVE_DEBOUNCE_MS);
+    waitingToSave.current.entries = entries;
+    const timeout = setTimeout(
+      () => saveWaitingEntries(template.id),
+      ENTRIES_SAVE_DEBOUNCE_MS,
+    );
 
     return () => clearTimeout(timeout);
   }, [template.id, entries]);
+
+  // Whatever the delayed saves were still waiting to store is stored when
+  // the page is closed or reloaded, and when this screen closes by any
+  // route. A refusal the user has not been told about holds the page: the
+  // browser asks before leaving, and the warning is there on staying.
+  useEffect(() => {
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (saveWhatIsWaiting(template.id)) event.preventDefault();
+    }
+    function handlePageHide() {
+      saveWhatIsWaiting(template.id);
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
+      saveWhatIsWaiting(template.id);
+    };
+  }, [template.id]);
+
+  // "Back to templates" and "Edit fields" store what is waiting first. If
+  // the browser refuses and the user is only now being told, they stay here
+  // with the warning: on this screen the PDF can still be downloaded, and
+  // leaving is what would lose it. Once told, leaving is not held back.
+  function leaveScreen(goThere: () => void) {
+    const justRefused = saveWhatIsWaiting(template.id);
+    if (!justRefused) goThere();
+  }
+
+  function handleRetrySave() {
+    const valuesSaved = saveTemplateValues(template.id, values);
+    const entriesSaved = saveTemplateEntries(template.id, entries);
+    unsavedNow.current = { values: !valuesSaved, entries: !entriesSaved };
+    setUnsaved(unsavedNow.current);
+    if (!valuesSaved || !entriesSaved) setSaveFailure("form-and-people");
+  }
 
   // Background backstop: keeps the active entry roughly in sync while the
   // user is mid-typing. The switch/add-next handlers below do their own
@@ -257,12 +441,27 @@ export function FieldForm({
   // can't be relied on to have caught up before the next click.
   useEffect(() => {
     if (activeEntryId === null) return;
-    setEntries((current) =>
-      current.map((entry) =>
+    setEntries((current) => {
+      // Already in step (a person just selected, or just restored on
+      // opening): the list is left as it is, so it is not saved again.
+      const active = current.find((entry) => entry.id === activeEntryId);
+      if (!active || active.values === values) return current;
+      return current.map((entry) =>
         entry.id === activeEntryId ? { ...entry, values } : entry,
-      ),
-    );
+      );
+    });
   }, [activeEntryId, values]);
+
+  // True while the form holds someone typed in but not added to the list
+  // yet: something has been typed, and it is more than the company details
+  // every new person starts with.
+  const formHoldsNewPerson =
+    activeEntryId === null &&
+    hasAnyValue(values) &&
+    !sameValues(
+      values,
+      computeEmployerAutofill(boxes, template.employerFields ?? []),
+    );
 
   function handleChange(boxId: string, value: string) {
     setValues((current) => ({ ...current, [boxId]: value }));
@@ -299,7 +498,9 @@ export function FieldForm({
 
   // Flushes the form's current values into whichever entry was active
   // before switching (same reasoning as handleAddAndFillNext above) so
-  // clicking around the list never silently discards unsaved edits.
+  // clicking around the list never silently discards unsaved edits. A new
+  // person typed in but not added yet is added to the list first, for the
+  // same reason: the switch used to throw them away without a word.
   function handleSelectEntry(entryId: string) {
     if (entryId === activeEntryId) return;
 
@@ -309,13 +510,17 @@ export function FieldForm({
     const target = entries.find((candidate) => candidate.id === entryId);
     if (!target) return;
 
-    setEntries((current) =>
-      activeEntryId === null
+    const typedPerson: TemplateEntry | null = formHoldsNewPerson
+      ? { id: crypto.randomUUID(), values }
+      : null;
+    setEntries((current) => {
+      if (typedPerson) return [...current, typedPerson];
+      return activeEntryId === null
         ? current
         : current.map((entry) =>
             entry.id === activeEntryId ? { ...entry, values } : entry,
-          ),
-    );
+          );
+    });
     setActiveEntryId(entryId);
     setValues(target.values);
   }
@@ -358,10 +563,16 @@ export function FieldForm({
 
   // Separate from deleting one person at a time — lets the user start a
   // fresh batch without clicking "delete" on everyone individually.
+  //
+  // The form is only emptied when it was showing one of the people being
+  // removed. Someone still being typed in is not in the list (the
+  // confirmation counts only the people who are), so they stay in the form.
   function handleClearAllEntries() {
     setEntries([]);
-    setActiveEntryId(null);
-    setValues(computeEmployerAutofill(boxes, template.employerFields ?? []));
+    if (activeEntryId !== null) {
+      setActiveEntryId(null);
+      setValues(computeEmployerAutofill(boxes, template.employerFields ?? []));
+    }
     setConfirmingClearEntries(false);
   }
 
@@ -383,10 +594,11 @@ export function FieldForm({
     setPositionsDirty(true);
   }
 
+  // A save the browser refused leaves "Unsaved changes" showing.
   function handleSaveChanges() {
     setSaving(true);
-    saveTemplateBoxes(template.id, boxes);
-    setPositionsDirty(false);
+    if (saveTemplateBoxes(template.id, boxes)) setPositionsDirty(false);
+    else setSaveFailure("positions");
     setSaving(false);
   }
 
@@ -424,13 +636,32 @@ export function FieldForm({
               ),
               ...(activeEntryId === null ? [values] : []),
             ];
+      const replaced: ReplacedCharacters[] = [];
       const bytes = await exportFilledPdf(
         template.pdfData,
         boxes,
         entriesValues,
+        (found) => replaced.push(found),
       );
       const filename = `${template.name.replace(/[^a-z0-9]+/gi, "_")}.pdf`;
       downloadPdfBytes(bytes, filename);
+
+      // A character the fonts cannot print no longer stops the download:
+      // it is replaced, and the people and fields concerned are listed.
+      if (replaced.length > 0) {
+        setUnprintedValues(
+          replaced.map(({ entryIndex, boxName, characters }) => ({
+            person:
+              entries.length === 0
+                ? null
+                : entryIndex < entries.length
+                  ? `Person ${entryIndex + 1}`
+                  : "The person in the form (not in the list yet)",
+            boxName,
+            characters,
+          })),
+        );
+      }
     } catch (err) {
       console.error("Export failed:", err);
       setError(
@@ -479,7 +710,7 @@ export function FieldForm({
               </>
             )}
           </Button>
-          <Button variant="outline" onClick={onEditFields}>
+          <Button variant="outline" onClick={() => leaveScreen(onEditFields)}>
             Edit fields
           </Button>
           {boxes.length > 0 && (
@@ -490,11 +721,30 @@ export function FieldForm({
               Clear values
             </Button>
           )}
-          <Button variant="outline" onClick={onBack}>
+          <Button variant="outline" onClick={() => leaveScreen(onBack)}>
             Back to templates
           </Button>
         </div>
       </div>
+
+      {/* Stays for as long as what is on this screen is not stored. */}
+      {notSaved && (
+        <div
+          role="alert"
+          className="notice-panel notice-danger flex-wrap items-center"
+        >
+          <TriangleAlertIcon />
+          <p className="min-w-0 flex-1 basis-80">
+            <strong>NOT saved.</strong> The browser's storage for this tool is
+            full, so what you see on this screen is not saved. It will be gone
+            when this page is closed or reloaded. You can still download the
+            PDF now.
+          </p>
+          <Button variant="outline" size="sm" onClick={handleRetrySave}>
+            Try saving again
+          </Button>
+        </div>
+      )}
 
       {boxes.length === 0 ? (
         <div className="glass flex animate-rise flex-col items-center gap-4 p-12 text-center">
@@ -504,7 +754,7 @@ export function FieldForm({
           <p className="text-muted">
             This template doesn't have any fields yet.
           </p>
-          <Button onClick={onEditFields}>Add fields</Button>
+          <Button onClick={() => leaveScreen(onEditFields)}>Add fields</Button>
         </div>
       ) : (
         <div className="flex w-full flex-col items-start gap-5 xl:flex-row xl:justify-between">
@@ -657,6 +907,9 @@ export function FieldForm({
               <h3 className="card-title">
                 People
               </h3>
+              {unsaved.entries && (
+                <span className="badge text-danger">Not saved</span>
+              )}
               {entries.length > 0 && (
                 <Button
                   variant="ghost"
@@ -823,6 +1076,49 @@ export function FieldForm({
             <Button variant="destructive" onClick={handleClearAllEntries}>
               Clear all
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <SaveFailedDialog
+        open={saveFailure !== null}
+        onClose={() => setSaveFailure(null)}
+      >
+        {saveFailure === "form-and-people"
+          ? 'What you see on this screen is still here, and you can still download the PDF now, but it will be gone when this page is closed or reloaded. To make room, open this tool in another browser tab and delete a template you no longer need there, then come back here and press "Try saving again".'
+          : undefined}
+      </SaveFailedDialog>
+
+      <Dialog
+        open={unprintedValues !== null}
+        onOpenChange={(open) => !open && setUnprintedValues(null)}
+      >
+        <DialogContent>
+          <DialogHeader icon={<TriangleAlertIcon />} tone="warn">
+            <DialogTitle>Some characters could not be printed</DialogTitle>
+            <DialogDescription>
+              Your PDF was downloaded, but the fonts this tool can use do not
+              have every character. Each one listed here was replaced with
+              "?" in the PDF (a line break or tab with a space). Please check
+              these before you use it.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="flex flex-col gap-1.5 text-sm text-fg">
+            {(unprintedValues ?? []).map((unprinted, index) => (
+              <li key={index}>
+                {unprinted.person ? `${unprinted.person}, ` : ""}
+                {unprinted.boxName}:{" "}
+                {unprinted.characters
+                  .map((character) =>
+                    /\s/.test(character) ? "line break or tab" : character,
+                  )
+                  .filter((text, at, all) => all.indexOf(text) === at)
+                  .join(" ")}
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button onClick={() => setUnprintedValues(null)}>OK</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

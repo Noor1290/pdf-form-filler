@@ -145,6 +145,36 @@ export async function readStoredTemplates(target) {
   return raw ? JSON.parse(raw) : [];
 }
 
+// Fills what is left of this site's storage, to the last character, and
+// returns how many characters it then holds.
+export async function fillStorage(target) {
+  return target.evaluate(() => {
+    let size = 1024 * 1024;
+    let i = 0;
+    while (size >= 1) {
+      try {
+        localStorage.setItem(`zz_test_fill_${i}`, "x".repeat(size));
+        i++;
+      } catch {
+        size = Math.floor(size / 2);
+      }
+    }
+    for (;;) {
+      try {
+        localStorage.setItem("zz_test_fill_0", `${localStorage.getItem("zz_test_fill_0")}x`);
+      } catch {
+        break;
+      }
+    }
+    let used = 0;
+    for (let k = 0; k < localStorage.length; k++) {
+      const key = localStorage.key(k);
+      used += key.length + localStorage.getItem(key).length;
+    }
+    return used;
+  });
+}
+
 const hundredth = (value) => Math.round(value * 100) / 100;
 
 // Stored templates without the parts that differ on every run (random ids,

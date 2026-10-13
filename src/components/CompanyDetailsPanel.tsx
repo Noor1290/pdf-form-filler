@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { CheckIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { SaveFailedDialog } from "@/components/SaveFailedDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,9 +11,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { DEFAULT_FIELDS, getLegacyEmployerFields } from "@/lib/employerProfile";
-import { saveTemplateEmployerFields } from "@/lib/template";
+import { DEFAULT_FIELDS } from "@/lib/employerProfile";
+import { templateStore } from "@/lib/templateStore";
 import type { EmployerField, Template } from "@/types/template";
+
+const { getLegacyEmployerFields, saveTemplateEmployerFields } = templateStore;
 
 type CompanyDetailsPanelProps = {
   template: Template;
@@ -33,6 +36,7 @@ export function CompanyDetailsPanel({
     () => template.employerFields ?? null,
   );
   const [saved, setSaved] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [deletingField, setDeletingField] = useState<EmployerField | null>(
     null,
   );
@@ -98,7 +102,10 @@ export function CompanyDetailsPanel({
       const original = originalLabelsById.current.get(field.id);
       return original ? { ...field, label: original } : field;
     });
-    saveTemplateEmployerFields(template.id, cleaned);
+    if (!saveTemplateEmployerFields(template.id, cleaned)) {
+      setSaveFailed(true);
+      return;
+    }
     setFields(cleaned);
     originalLabelsById.current = new Map(
       cleaned.map((field) => [field.id, field.label]),
@@ -246,6 +253,11 @@ export function CompanyDetailsPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SaveFailedDialog
+        open={saveFailed}
+        onClose={() => setSaveFailed(false)}
+      />
     </div>
   );
 }

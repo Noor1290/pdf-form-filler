@@ -8,6 +8,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { BoxStyleDialog } from "@/components/BoxStyleDialog";
+import { SaveFailedDialog } from "@/components/SaveFailedDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,9 +31,11 @@ import {
   renderPdfPageToCanvas,
 } from "@/lib/pdf";
 import { resizeHandleStyles } from "@/lib/rndHandleStyles";
-import { saveTemplateBoxes } from "@/lib/template";
+import { templateStore } from "@/lib/templateStore";
 import { inferValidationType } from "@/lib/validation";
 import type { FieldBox, Template } from "@/types/template";
+
+const { saveTemplateBoxes } = templateStore;
 
 type BoxEditorProps = {
   template: Template;
@@ -60,6 +63,7 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
   const [boxes, setBoxes] = useState<FieldBox[]>(template.boxes);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const [draftRect, setDraftRect] = useState<PixelRect | null>(null);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
@@ -228,10 +232,11 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
     setRenamingBox(null);
   }
 
+  // A save the browser refused leaves "Unsaved changes" showing.
   function handleSave() {
     setSaving(true);
-    saveTemplateBoxes(template.id, boxes);
-    setDirty(false);
+    if (saveTemplateBoxes(template.id, boxes)) setDirty(false);
+    else setSaveFailed(true);
     setSaving(false);
   }
 
@@ -467,6 +472,11 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
         box={boxes.find((box) => box.id === editingBoxId) ?? null}
         onChange={updateBoxStyle}
         onClose={() => setEditingBoxId(null)}
+      />
+
+      <SaveFailedDialog
+        open={saveFailed}
+        onClose={() => setSaveFailed(false)}
       />
 
       <Dialog

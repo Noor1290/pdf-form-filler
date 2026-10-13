@@ -22,8 +22,12 @@ const approvedFile = path.join(here, "approved-strings.json");
 function compare(baseline, current, approved) {
   const problems = [];
   const names = new Set([...Object.keys(baseline), ...Object.keys(current)]);
+  // A screen added to the walk after the recording was made has no
+  // recording of its own. On it, wording recorded on any other screen is
+  // not new; anything else has to be approved, like everywhere else.
+  const recordedSomewhere = new Set(Object.values(baseline).flat());
   for (const name of [...names].sort()) {
-    const before = new Set(baseline[name] ?? []);
+    const before = name in baseline ? new Set(baseline[name]) : recordedSomewhere;
     const now = new Set(current[name] ?? []);
     if (!(name in current)) {
       problems.push({ kind: "MISSING SCREEN", text: name, name });
@@ -33,7 +37,7 @@ function compare(baseline, current, approved) {
         problems.push({ kind: "NEW    ", text, name });
       }
     }
-    for (const text of before) {
+    for (const text of baseline[name] ?? []) {
       if (!now.has(text) && !approved.removed.includes(text)) {
         problems.push({ kind: "REMOVED", text, name });
       }

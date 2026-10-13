@@ -6,6 +6,13 @@ const FIELDS_STORAGE_KEY = "pdf-editor:employer-fields";
 const LEGACY_PROFILE_KEY = "pdf-editor:employer-profile";
 const LEGACY_LABELS_KEY = "pdf-editor:employer-field-labels";
 
+// Every key this file reads, for the full backup (see browserData.ts).
+export const EMPLOYER_STORAGE_KEYS = [
+  FIELDS_STORAGE_KEY,
+  LEGACY_PROFILE_KEY,
+  LEGACY_LABELS_KEY,
+] as const;
+
 export const DEFAULT_FIELDS: EmployerField[] = [
   { id: "companyName", label: "Company Name", value: "" },
   { id: "address", label: "Address", value: "" },
