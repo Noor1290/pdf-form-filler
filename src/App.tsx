@@ -4,6 +4,7 @@ import {
   DownloadIcon,
   FileTextIcon,
   HardDriveIcon,
+  WifiOffIcon,
 } from "lucide-react";
 import { BoxEditor } from "@/components/BoxEditor";
 import { CompanyDetailsPanel } from "@/components/CompanyDetailsPanel";
@@ -11,12 +12,14 @@ import { CopyToCompanyDialog } from "@/components/CopyToCompanyDialog";
 import { DashboardBar } from "@/components/DashboardBar";
 import { DashboardDataNotice } from "@/components/DashboardDataNotice";
 import { FieldForm } from "@/components/FieldForm";
+import { HistoryDialog } from "@/components/HistoryDialog";
 import { ImportToDashboard } from "@/components/ImportToDashboard";
 import { NewTemplateFlow } from "@/components/NewTemplateFlow";
 import { SaveFailedDialog } from "@/components/SaveFailedDialog";
 import { TemplateList } from "@/components/TemplateList";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
+import { formatLoadedAt, listCachedCopies } from "@/lib/dashboardCache";
 import { readImported, templatesNotImported } from "@/lib/dashboardImport";
 import {
   connectDashboard,
@@ -24,6 +27,8 @@ import {
   dashboardLoadProblems,
   dashboardStatus,
   dashboardStore,
+  offlineStore,
+  openOfflineCopy,
 } from "@/lib/dashboardStore";
 import { readDashboardPayroll, type DashboardPayroll } from "@/lib/payrollHub";
 import { setTemplateStore, templateStore } from "@/lib/templateStore";
@@ -38,7 +43,9 @@ const { deleteTemplate, getTemplate, listTemplates, renameTemplate } =
 // while it waits, "dashboard" once the templates are loaded from there,
 // "failed" when they could not be, and "browser" when the dashboard is an
 // older one that does not keep templates yet.
-type Kept = "browser" | "starting" | "dashboard" | "failed";
+// "offline" is this browser's last copy of a company's templates from the
+// dashboard, opened read-only because the dashboard could not be reached.
+type Kept = "browser" | "starting" | "dashboard" | "failed" | "offline";
 
 type View =
   | { name: "home" }
@@ -64,6 +71,13 @@ function App() {
   const [startProblem, setStartProblem] = useState("");
   // The template being copied to another company, if any.
   const [copying, setCopying] = useState<Template | null>(null);
+  // The template whose history is open, if any.
+  const [historyOf, setHistoryOf] = useState<Template | null>(null);
+  // Which offline copy is open: whose templates, and from when.
+  const [offlineCopy, setOfflineCopy] = useState<{
+    label: string;
+    loadedAt: string;
+  } | null>(null);
   // True while the import dialog is open, so it can show its results.
   const [importOpen, setImportOpen] = useState(false);
   // Redrawn whenever a save to the dashboard starts, lands or fails.
@@ -190,7 +204,10 @@ function App() {
 
   // The templates can be shown and worked on: not while they are still
   // being loaded from the dashboard, and not when that failed.
-  const usable = kept === "browser" || kept === "dashboard";
+  const usable =
+    kept === "browser" || kept === "dashboard" || kept === "offline";
+  // The offline copy can be opened and filled in, and nothing else.
+  const readOnly = kept === "offline";
   const company = kept === "dashboard" ? dashboardCompany() : null;
   // This browser's own templates that the dashboard does not have yet.
   const notImported =
@@ -304,6 +321,67 @@ function App() {
           </div>
         )}
 
+        {kept === "failed" &&
+          listCachedCopies().map((copy) => (
+            <div
+              key={copy.brn}
+              className="glass flex w-full max-w-2xl flex-wrap items-center gap-3 p-4"
+            >
+              <div className="icon-tile">
+                <WifiOffIcon className="size-5" />
+              </div>
+              <div className="flex min-w-48 flex-1 flex-col gap-0.5">
+                <span className="font-semibold text-fg">
+                  {copy.label}: a copy from {formatLoadedAt(copy.loadedAt)}
+                </span>
+                <span className="text-sm text-muted">
+                  The last one this browser loaded from the dashboard. It can be
+                  opened to fill in and download, not to change.
+                </span>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  const opened = openOfflineCopy(copy.brn);
+                  if (!opened) return;
+                  setTemplateStore(offlineStore);
+                  setOfflineCopy(opened);
+                  setKept("offline");
+                  setView({ name: "home" });
+                  setTemplates(templateStore.listTemplates());
+                }}
+              >
+                Open the offline copy of {copy.label}
+              </Button>
+            </div>
+          ))}
+
+        {kept === "offline" && offlineCopy && (
+          <div
+            role="status"
+            className={`notice-panel notice-warn w-full flex-wrap items-center ${
+              view.name === "fill" ? "max-w-296" : "max-w-4xl"
+            }`}
+          >
+            <WifiOffIcon />
+            <span className="min-w-48 flex-1">
+              <strong>
+                Offline: read-only copy from{" "}
+                {formatLoadedAt(offlineCopy.loadedAt)}. Changes can't be saved.
+              </strong>{" "}
+              These are the templates of {offlineCopy.label}. You can fill them
+              in and download the PDF.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void loadFromDashboard()}
+            >
+              Try the dashboard again
+            </Button>
+          </div>
+        )}
+
         {kept === "dashboard" && company && (
           <DashboardBar
             company={company}
@@ -358,6 +436,12 @@ function App() {
                 ? (id) => setCopying(getTemplate(id) ?? null)
                 : undefined
             }
+            onHistory={
+              kept === "dashboard"
+                ? (id) => setHistoryOf(getTemplate(id) ?? null)
+                : undefined
+            }
+            readOnly={readOnly}
           />
         )}
 
@@ -395,6 +479,7 @@ function App() {
             dashboardData={previewClosed ? null : waitingPayroll}
             onDashboardImported={discardWaitingPayroll}
             onDashboardPreviewClosed={() => setPreviewClosed(true)}
+            readOnly={readOnly}
           />
         )}
       </main>
@@ -402,6 +487,14 @@ function App() {
       <CopyToCompanyDialog
         template={copying}
         onClose={() => setCopying(null)}
+      />
+
+      <HistoryDialog
+        template={historyOf}
+        companyName={company?.label ?? ""}
+        canRestore={company?.role === "admin"}
+        onRestored={refreshTemplates}
+        onClose={() => setHistoryOf(null)}
       />
 
       <SaveFailedDialog

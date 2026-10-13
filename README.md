@@ -31,6 +31,8 @@ Opened inside the Payroll Hub dashboard, the tool keeps its templates in the das
 - The values typed into a form and the People list are never sent: they stay in this browser.
 - "Copy to another company" copies a template and its PDF to another company the user is an admin of.
 - "Import to the dashboard" copies this browser's templates there, once, after a backup. This browser's copy is kept as it is; on its own the tool then says "This browser only. Not the dashboard's copy."
+- "History" lists a template's saved versions with the date, the time and who saved it, shows any of them drawn on its PDF, and lets an admin restore one. A restore is saved as a new revision: no earlier version is deleted or rewritten.
+- When the dashboard cannot be reached, the tool offers the last copy of each company's templates this browser loaded from it (`src/lib/dashboardCache.ts`), read-only: "Offline: read-only copy from [date and time]. Changes can't be saved." Forms can still be filled in and downloaded. If the browser has no room to keep that copy, none is kept and none is offered.
 - With a dashboard that does not keep templates yet, the tool uses this browser.
 
 ## Checks

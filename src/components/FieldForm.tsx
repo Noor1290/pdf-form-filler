@@ -65,6 +65,9 @@ type FieldFormProps = {
   dashboardData: DashboardPayroll | null;
   onDashboardImported: () => void;
   onDashboardPreviewClosed: () => void;
+  // The offline copy: the form can be filled in and the PDF downloaded, but
+  // nothing about the template can be changed (its fields, or where they sit).
+  readOnly?: boolean;
 };
 
 const PAGE_WIDTH = 800;
@@ -142,6 +145,7 @@ export function FieldForm({
   dashboardData,
   onDashboardImported,
   onDashboardPreviewClosed,
+  readOnly = false,
 }: FieldFormProps) {
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -696,6 +700,7 @@ export function FieldForm({
               </Button>
             </>
           )}
+          {!readOnly && (
           <Button
             variant="outline"
             onClick={() => setLocked((current) => !current)}
@@ -710,9 +715,12 @@ export function FieldForm({
               </>
             )}
           </Button>
-          <Button variant="outline" onClick={() => leaveScreen(onEditFields)}>
-            Edit fields
-          </Button>
+          )}
+          {!readOnly && (
+            <Button variant="outline" onClick={() => leaveScreen(onEditFields)}>
+              Edit fields
+            </Button>
+          )}
           {boxes.length > 0 && (
             <Button
               variant="outline"
@@ -754,7 +762,9 @@ export function FieldForm({
           <p className="text-muted">
             This template doesn't have any fields yet.
           </p>
-          <Button onClick={() => leaveScreen(onEditFields)}>Add fields</Button>
+          {!readOnly && (
+            <Button onClick={() => leaveScreen(onEditFields)}>Add fields</Button>
+          )}
         </div>
       ) : (
         <div className="flex w-full flex-col items-start gap-5 xl:flex-row xl:justify-between">

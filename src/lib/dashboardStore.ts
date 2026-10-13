@@ -1,5 +1,10 @@
 import { PDFDocument } from "pdf-lib";
 import { DASHBOARD_VALUES_KEY } from "@/lib/browserData";
+import {
+  type CachedCopy,
+  readCachedCopy,
+  writeCachedCopy,
+} from "@/lib/dashboardCache";
 import { getLegacyEmployerFields } from "@/lib/employerProfile";
 import {
   type HubFailure,
@@ -246,6 +251,7 @@ async function loadEverything(): Promise<
 
   const local = readLocalValues();
   const files = new Map<string, string>();
+  const loadedRows: TemplateRow[] = [];
   for (const summary of list.rows) {
     const loaded = await askHub<TemplateRow>("pdf-template", {
       action: "load",
@@ -288,6 +294,7 @@ async function loadEverything(): Promise<
       filesThere.add(row.pdf_sha256);
     }
 
+    loadedRows.push(row);
     const template = templateOf(row, pdfData, local[row.template_id]);
     held.set(template.id, {
       template,
@@ -297,6 +304,15 @@ async function loadEverything(): Promise<
       saved: wireText(template),
     });
   }
+  // Kept for when the dashboard cannot be reached (see dashboardCache.ts). If the
+  // browser has no room for it, there is simply no offline copy of this company.
+  writeCachedCopy({
+    brn: company.brn,
+    label: company.label,
+    loadedAt: new Date().toISOString(),
+    templates: loadedRows,
+    files: Object.fromEntries(files),
+  });
   publish();
   return { ok: true, company };
 }
@@ -714,3 +730,192 @@ export const heldRevision = (templateId: string) =>
   held.get(templateId)?.revision;
 
 export { bytesToBase64 };
+
+// ---------- a template's history ----------
+
+export type RevisionSummary = {
+  revision: number;
+  name: string;
+  saved_at: string;
+  saved_by_you: boolean;
+};
+
+// The kept revisions of a template, newest first.
+export async function templateHistory(
+  templateId: string,
+): Promise<
+  { ok: true; revisions: RevisionSummary[]; current: number } | HubFailure
+> {
+  const item = held.get(templateId);
+  if (!item || !company)
+    return fail("not-found", "This template is not loaded.");
+  const answer = await askHub<RevisionSummary>("pdf-template", {
+    action: "history",
+    template_id: templateId,
+    brn: company.brn,
+  });
+  if (!answer.ok) return answer;
+  return { ok: true, revisions: answer.rows, current: item.revision };
+}
+
+// One kept revision as a template that can be drawn: its fields on its PDF.
+// Reading it changes nothing, here or in the dashboard.
+export async function loadRevision(
+  templateId: string,
+  revision: number,
+): Promise<{ ok: true; template: Template } | HubFailure> {
+  const item = held.get(templateId);
+  if (!item || !company)
+    return fail("not-found", "This template is not loaded.");
+  const answer = await askHub<TemplateRow & { saved_at?: string }>(
+    "pdf-template",
+    { action: "load", template_id: templateId, revision, brn: company.brn },
+  );
+  if (!answer.ok) return answer;
+  const row = answer.rows[0];
+  if (!row) {
+    return fail("not-found", "The dashboard no longer has this revision.");
+  }
+
+  // An earlier revision may be drawn on an earlier PDF.
+  let pdfData = item.template.pdfData;
+  if (row.pdf_sha256 !== item.sha256) {
+    const file = await askHub<{ data: string }>("pdf-file", {
+      action: "download",
+      sha256: row.pdf_sha256,
+      brn: company.brn,
+    });
+    const data = file.ok ? file.rows[0]?.data : undefined;
+    if (
+      typeof data !== "string" ||
+      (await sha256Hex(base64ToBytes(data))) !== row.pdf_sha256
+    ) {
+      return fail(
+        "not-found",
+        "The PDF of this revision is missing from the dashboard.",
+      );
+    }
+    pdfData = data;
+  }
+  return {
+    ok: true,
+    template: templateOf(
+      { ...row, updated_at: row.saved_at ?? row.updated_at ?? "" },
+      pdfData,
+      undefined,
+    ),
+  };
+}
+
+// Makes an earlier revision the newest one. Nothing is deleted or rewritten:
+// the dashboard saves it as a new revision, and every earlier one stays.
+export async function restoreRevision(
+  templateId: string,
+  revision: number,
+): Promise<{ ok: true; revision: number } | HubFailure> {
+  const item = held.get(templateId);
+  if (!item || !company)
+    return fail("not-found", "This template is not loaded.");
+  // The restore names the revision last seen: save anything waiting first.
+  const waiting = timers.get(templateId);
+  if (waiting) {
+    clearTimeout(waiting);
+    timers.delete(templateId);
+  }
+  await saveNow(templateId);
+  const problem = problems.get(templateId);
+  if (problem) return problem;
+
+  const sent = await sendHub<SavedRow>("pdf-template", {
+    action: "restore",
+    brn: company.brn,
+    template_id: templateId,
+    revision,
+    expected_revision: item.revision,
+  });
+  if (!sent.ok) return sent;
+
+  // Show what the dashboard now holds.
+  const restored = await loadRevision(templateId, sent.result.revision);
+  if (restored.ok) {
+    const template: Template = {
+      ...restored.template,
+      values: item.template.values,
+      entries: item.template.entries,
+      createdAt: item.template.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+    const samePdf = restored.template.pdfData === item.template.pdfData;
+    held.set(templateId, {
+      template,
+      revision: sent.result.revision,
+      sha256: samePdf ? item.sha256 : null,
+      pages: samePdf ? item.pages : null,
+      saved: wireText(template),
+    });
+  } else {
+    await connectDashboard();
+  }
+  publish();
+  return { ok: true, revision: sent.result.revision };
+}
+
+// ---------- the offline copy: read-only ----------
+
+let offline: { copy: CachedCopy; templates: Map<string, Template> } | null =
+  null;
+
+// Opens this browser's last copy of a company's templates. Null when there
+// is none (it was never loaded here, or the browser had no room to keep it).
+export function openOfflineCopy(
+  brn: string,
+): { label: string; loadedAt: string } | null {
+  const copy = readCachedCopy(brn);
+  if (!copy) return null;
+  const local = readLocalValues();
+  const templates = new Map<string, Template>();
+  for (const row of copy.templates) {
+    const pdfData = copy.files[row.pdf_sha256];
+    if (typeof pdfData !== "string") continue;
+    templates.set(
+      row.template_id,
+      templateOf(row, pdfData, local[row.template_id]),
+    );
+  }
+  offline = { copy, templates };
+  return { label: copy.label, loadedAt: copy.loadedAt };
+}
+
+// Values and people are kept in this browser, as always.
+function keepOffline(
+  id: string,
+  change: Pick<Template, "values"> | Pick<Template, "entries">,
+): boolean {
+  const template = offline?.templates.get(id);
+  if (!offline || !template) return false;
+  offline.templates.set(id, { ...template, ...change });
+  const all = readLocalValues();
+  all[id] = { ...all[id], ...change };
+  return writeLocalValues(all);
+}
+
+// The store behind the offline copy. It can be read and filled in. Nothing
+// about a template itself can be changed: every such save answers "not
+// stored", and the screens do not offer it.
+export const offlineStore: TemplateStore = {
+  listTemplates: () =>
+    [...(offline?.templates.values() ?? [])].sort((a, b) =>
+      b.updatedAt.localeCompare(a.updatedAt),
+    ),
+  getTemplate: (id) => offline?.templates.get(id),
+  createTemplate() {
+    throw new Error("The offline copy is read-only.");
+  },
+  renameTemplate: () => false,
+  deleteTemplate: () => false,
+  saveTemplateBoxes: () => false,
+  saveTemplateEmployerFields: () => false,
+  saveTemplateValues: (id, values) => keepOffline(id, { values }),
+  saveTemplateEntries: (id, entries) => keepOffline(id, { entries }),
+  getLegacyEmployerFields,
+};

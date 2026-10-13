@@ -9,7 +9,8 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import { after, before, test } from "node:test";
-import { openFillScreen, startApp } from "./helpers/app.mjs";
+import { fillStorage, openFillScreen, startApp } from "./helpers/app.mjs";
+import { readPdfText } from "./helpers/read-pdf.mjs";
 import { COMPANY_DETAILS, FIELDS, buildSamplePdf, makeTemplate } from "./helpers/fake-data.mjs";
 import { openTemplatesStandin } from "./helpers/fake-hub.mjs";
 
@@ -589,5 +590,233 @@ test("after an import, opened on its own the tool uses this browser's copy and s
   const backup = JSON.parse(fs.readFileSync(await (await started).path(), "utf8"));
   assert.deepEqual(backup.stored[IMPORTED_KEY], note);
   assert.equal(await page.locator(BACKUP_INPUT).count(), 1);
+  await context.close();
+});
+
+// ====================================================== history and restore
+
+// The template as it is now (revision 2, saved by this user) and as it was
+// first saved by someone else: another name, and only two fields.
+function withHistory(more = {}) {
+  const now = held({ revision: 2, updated_at: "2026-10-05T09:30:00.000Z" });
+  const first = { ...now, revision: 1, name: "First Name", body: { boxes: FIELDS.slice(0, 2) }, updated_at: "2026-10-01T08:00:00.000Z" };
+  return seedOf({
+    templates: [now],
+    history: [
+      { ...first, saved_at: first.updated_at, saved_by_you: false },
+      { ...now, saved_at: now.updated_at, saved_by_you: true },
+    ],
+    ...more,
+  });
+}
+
+async function openHistory(frame) {
+  await button(frame, "History").click();
+  const box = dialog(frame, 'History of "Dashboard Form"');
+  await box.getByRole("list", { name: "Saved versions" }).waitFor();
+  return box;
+}
+const versions = async (box) =>
+  (await box.getByRole("list", { name: "Saved versions" }).getByRole("button").allInnerTexts()).map((text) => text.replace(/\s+/g, " ").trim());
+
+test("History lists a template's saved versions, newest first, with the date, the time and who saved it", TIMEOUT, async () => {
+  const { context, frame } = await openInDashboard(withHistory());
+  await loaded(frame);
+  const box = await openHistory(frame);
+  assert.deepEqual(await versions(box), [
+    "Revision 2 (current) 5 Oct 2026, 09:30, saved by you Dashboard Form",
+    "Revision 1 1 Oct 2026, 08:00, saved by someone else First Name",
+  ]);
+  await context.close();
+});
+
+test("History: a version can be looked at, its fields drawn on the PDF, and looking changes nothing", TIMEOUT, async () => {
+  const { context, frame, hub } = await openInDashboard(withHistory());
+  await loaded(frame);
+  const box = await openHistory(frame);
+  await box.getByRole("button", { name: /^Revision 1/ }).click();
+  await box.getByText("Revision 1: 2 fields on fake-form.pdf").waitFor();
+  await box.locator("canvas").waitFor();
+  await frame.waitForFunction(() => (document.querySelector('[role="dialog"] canvas')?.width ?? 0) > 310);
+  // The two fields of that version are drawn where they were, by name; the current version has more.
+  await box.locator(".preview-frame .absolute").first().waitFor();
+  const drawn = await box.locator(".preview-frame .absolute").allInnerTexts();
+  assert.deepEqual(drawn.sort(), FIELDS.slice(0, 2).map((f) => f.name).sort());
+  const first = await box.locator(".preview-frame .absolute").first().boundingBox();
+  const canvas = await box.locator("canvas").boundingBox();
+  assert.ok(first.x >= canvas.x && first.y >= canvas.y && first.x + first.width <= canvas.x + canvas.width + 1, "a field lies on the page");
+
+  await box.getByRole("button", { name: /^Revision 2/ }).click();
+  await box.getByText(`Revision 2: ${FIELDS.length} fields on fake-form.pdf`).waitFor();
+  await box.getByText("This is the version in use now.").waitFor();
+
+  // Nothing was saved or restored, and the template is as it was.
+  assert.deepEqual((await hub.log()).filter((m) => m.kind === "save"), []);
+  assert.deepEqual((await hub.templates()).map((t) => [t.name, t.revision]), [["Dashboard Form", 2]]);
+  await button(box, "Close").click();
+  await row(frame, "Dashboard Form").waitFor();
+  await context.close();
+});
+
+test("History: \"Restore this version\" asks first, then saves it as a NEW revision; no earlier version is deleted or rewritten", TIMEOUT, async () => {
+  const { context, frame, hub } = await openInDashboard(withHistory());
+  await loaded(frame);
+  const kept = () => hub.state(() => window.hub.state.history.map((h) => ({ revision: h.revision, name: h.name, fields: h.body.boxes.length })));
+  const before = await kept();
+  const box = await openHistory(frame);
+  await box.getByRole("button", { name: /^Revision 1/ }).click();
+  await button(box, "Restore this version").click();
+
+  const question = box.getByRole("alert");
+  assert.ok((await question.innerText()).includes("Restore revision 1? It is saved as a new revision, and every earlier version is kept."));
+  // Cancel: nothing was sent.
+  await button(question, "Cancel").click();
+  assert.deepEqual((await hub.log()).filter((m) => m.kind === "save"), []);
+
+  await button(box, "Restore this version").click();
+  await button(box.getByRole("alert"), "Restore").click();
+  await box.getByText("Restored. It was saved as revision 3; the earlier versions are all still here.").waitFor();
+
+  const sent = (await hub.log()).filter((m) => m.kind === "save");
+  assert.deepEqual(sent.map((m) => [m.action, m.revision, m.expected_revision]), [["restore", 1, 2]]);
+  // The template is now revision 3 with the first version's name and fields.
+  const [now] = await hub.templates();
+  assert.deepEqual([now.name, now.revision, now.body.boxes.length], ["First Name", 3, 2]);
+  // History only grew: revisions 1 and 2 are exactly as they were.
+  const after = await kept();
+  assert.deepEqual(after.slice(0, 2), before);
+  assert.deepEqual(after[2], { revision: 3, name: "First Name", fields: 2 });
+  assert.equal((await versions(box))[0].startsWith("Revision 3 (current)"), true);
+
+  // The tool shows the restored template, and the next change carries revision 3.
+  await button(box, "Close").click();
+  await row(frame, "First Name").waitFor();
+  await saved(frame);
+  await rename(frame, "First Name", "After The Restore");
+  await saved(frame);
+  assert.equal((await hub.saves()).at(-1).expected_revision, 3);
+  await context.close();
+});
+
+test("History: someone who is not an admin can look at versions but is not offered Restore", TIMEOUT, async () => {
+  const { context, frame, hub } = await openInDashboard(withHistory({ role: "member" }));
+  await loaded(frame);
+  const box = await openHistory(frame);
+  await box.getByRole("button", { name: /^Revision 1/ }).click();
+  await box.getByText("Revision 1: 2 fields on fake-form.pdf").waitFor();
+  await box.getByText("Only an admin of ABC Co Ltd can restore a version.").waitFor();
+  assert.equal(await button(box, "Restore this version").count(), 0);
+  assert.deepEqual((await hub.log()).filter((m) => m.kind === "save"), []);
+  await context.close();
+});
+
+// ================================================== offline, read-only copy
+
+const CACHE_KEY = "pdf-editor:dashboard-cache:C1234567";
+const OFFLINE_LABEL = /Offline: read-only copy from \d{1,2} \w+ \d{4} at \d{2}:\d{2}\. Changes can't be saved\./;
+const goDown = (hub) => hub.set(() => (window.hub.state.down = true));
+const offer = (frame, company) => button(frame, `Open the offline copy of ${company}`);
+
+test("offline: when the dashboard can't be reached, the last copy loaded from it opens read-only, clearly labelled, and can still be filled in and downloaded", TIMEOUT, async () => {
+  const { context, page, frame, hub } = await openInDashboard();
+  await loaded(frame);
+  // Loading kept a copy: what the dashboard holds, and the PDF. No typed values.
+  const copy = JSON.parse((await appStorage(frame))[CACHE_KEY]);
+  assert.deepEqual({ brn: copy.brn, label: copy.label, names: copy.templates.map((t) => t.name), files: Object.keys(copy.files) }, { brn: "C1234567", label: "ABC Co Ltd", names: ["Dashboard Form"], files: [sha] });
+  assert.equal(copy.files[sha], pdf.toString("base64"));
+
+  await goDown(hub);
+  await frame.evaluate(() => location.reload());
+  await frame.getByText("The templates could not be loaded from the dashboard.").waitFor();
+  await offer(frame, "ABC Co Ltd").click();
+
+  const label = frame.getByRole("status").filter({ hasText: "Offline" });
+  assert.match((await label.innerText()).replace(/\s+/g, " "), OFFLINE_LABEL);
+  assert.ok((await label.innerText()).includes("These are the templates of ABC Co Ltd."));
+  await row(frame, "Dashboard Form").waitFor();
+  // Nothing that changes a template is offered.
+  for (const name of ["Edit fields", "Company details", "Rename", "Delete", "Copy to another company", "History", "New Template", "Upload a PDF", "Back up", "Restore"]) {
+    assert.equal(await button(frame, name).count(), 0, name);
+  }
+
+  // Filling in and downloading still work.
+  await openFillScreen(frame, "Dashboard Form");
+  for (const name of ["Edit fields", "Positions locked", "Positions unlocked", "Add fields"]) {
+    assert.equal(await frame.getByRole("button", { name }).count(), 0, name);
+  }
+  assert.match((await label.innerText()).replace(/\s+/g, " "), OFFLINE_LABEL);
+  await frame.getByLabel("Surname", { exact: true }).fill("Offline-Sampleton");
+  const started = page.waitForEvent("download");
+  await button(frame, "Download PDF").click();
+  const text = await readPdfText(fs.readFileSync(await (await started).path()));
+  assert.ok(JSON.stringify(text).includes("Offline-Sampleton"), JSON.stringify(text).slice(0, 300));
+  // What was typed is kept in this browser, as always; nothing was sent to be saved.
+  await frame.waitForTimeout(800);
+  assert.ok((await appStorage(frame))[VALUES_KEY].includes("Offline-Sampleton"));
+  assert.deepEqual((await hub.log()).filter((m) => m.kind === "save"), []);
+
+  // When the dashboard is back, "Try the dashboard again" returns to the live templates.
+  await button(frame, "Back to templates").click();
+  await hub.set(() => (window.hub.state.down = false));
+  await button(frame, "Try the dashboard again").click();
+  await loaded(frame);
+  assert.equal(await frame.getByText("Offline:").count(), 0);
+  assert.equal(await button(frame, "Rename").count(), 1);
+  await context.close();
+});
+
+test("offline: a copy is kept per company, and each is offered by name with when it was loaded", TIMEOUT, async () => {
+  const copyOf = (brn, label, name, loadedAt) =>
+    JSON.stringify({ brn, label, loadedAt, templates: [held({ name })], files: { [sha]: pdf.toString("base64") } });
+  const { context, frame } = await openInDashboard(seedOf({ down: true }), {
+    "pdf-editor:dashboard-cache:C1234567": copyOf("C1234567", "ABC Co Ltd", "ABC Form", "2026-10-12T07:15:00.000Z"),
+    "pdf-editor:dashboard-cache:C7654321": copyOf("C7654321", "XYZ Trading Ltd", "XYZ Form", "2026-10-13T16:40:00.000Z"),
+  });
+  await frame.getByText("The templates could not be loaded from the dashboard.").waitFor();
+  await frame.getByText("ABC Co Ltd: a copy from 12 October 2026 at 07:15").waitFor();
+  await frame.getByText("XYZ Trading Ltd: a copy from 13 October 2026 at 16:40").waitFor();
+
+  await offer(frame, "XYZ Trading Ltd").click();
+  const label = (await frame.getByRole("status").filter({ hasText: "Offline" }).innerText()).replace(/\s+/g, " ");
+  assert.ok(label.includes("Offline: read-only copy from 13 October 2026 at 16:40. Changes can't be saved."), label);
+  assert.ok(label.includes("These are the templates of XYZ Trading Ltd."), label);
+  await row(frame, "XYZ Form").waitFor();
+  assert.equal(await row(frame, "ABC Form").count(), 0);
+  await context.close();
+});
+
+test("offline: when the browser has no room to keep the copy, none is kept and no offline copy is offered", TIMEOUT, async () => {
+  const { context, frame, hub } = await openInDashboard();
+  await loaded(frame);
+  assert.ok((await appStorage(frame))[CACHE_KEY]);
+
+  // The rest of this site's storage is taken, then the templates are loaded again with one
+  // more template: the copy no longer fits.
+  await hub.set((extra) => window.hub.state.templates.set(extra.template_id, extra), held({ template_id: T2, name: "One More Form" }));
+  await fillStorage(frame);
+  await frame.evaluate(() => location.reload());
+  await loaded(frame);
+  await row(frame, "One More Form").waitFor();
+  // The tool itself works as usual; there is just no copy, old or new, for this company.
+  assert.equal((await appStorage(frame))[CACHE_KEY], undefined);
+
+  await goDown(hub);
+  await frame.evaluate(() => location.reload());
+  await frame.getByText("The templates could not be loaded from the dashboard.").waitFor();
+  await button(frame, "Try again").waitFor();
+  assert.equal(await frame.getByRole("button", { name: /^Open the offline copy/ }).count(), 0);
+  await context.close();
+});
+
+test("on its own the tool has no History and no offline copy: it uses this browser, as before", TIMEOUT, async () => {
+  const { context } = await app.newContext();
+  const page = await context.newPage();
+  await page.goto(app.appUrl);
+  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [TEMPLATES_KEY, JSON.stringify([makeTemplate(pdf)])]);
+  await page.reload();
+  await row(page, "Fake Form").waitFor();
+  assert.equal(await button(page, "History").count(), 0);
+  assert.equal(await page.getByText("Offline:").count(), 0);
+  assert.equal(await button(page, "Edit fields").count(), 1);
   await context.close();
 });

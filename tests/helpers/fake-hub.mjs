@@ -21,6 +21,10 @@ export function createFakeHub(seed) {
     // sha256 -> base64
     files: new Map(Object.entries(seed.files || {})),
     others: seed.others || [{ brn: "C0000001", name: "New Venture Ltd" }],
+    // Every revision that was ever saved: { template_id, revision, name, body, pdf_*, saved_at, saved_by_you }.
+    history: (seed.history || (seed.templates || []).map((row) => ({ ...row, saved_at: row.updated_at, saved_by_you: true }))).map((row) => ({ ...row })),
+    // True while the dashboard cannot reach its database: everything is refused.
+    down: seed.down === true,
     copies: [],
     // Every message from the app about templates and files, without file content.
     log: [],
@@ -77,7 +81,20 @@ export function createFakeHub(seed) {
     switch (params.action) {
       case "list":
         return answer([...state.templates.values()].map(summary));
+      case "history":
+        return answer(
+          state.history
+            .filter((h) => h.template_id === params.template_id)
+            .sort((a, b) => b.revision - a.revision)
+            .map(({ revision, name, saved_at, saved_by_you }) => ({ revision, name, saved_at, saved_by_you })),
+        );
       case "load": {
+        if (params.revision !== undefined) {
+          const kept = state.history.find((h) => h.template_id === params.template_id && h.revision === params.revision);
+          if (!kept) return refuse("not-found", "This PDF template has no such revision.");
+          const { updated_at: _updated, updated_by_you: _you, ...revision } = kept;
+          return answer([revision]);
+        }
         const row = state.templates.get(params.template_id);
         return row ? answer([{ ...row, updated_by_you: true }]) : refuse("not-found", "This company has no such PDF template.");
       }
@@ -119,6 +136,17 @@ export function createFakeHub(seed) {
       return { ok: true, result: { action: "delete", template_id: row.template_id, name: existing.name } };
     }
 
+    if (row.action === "restore") {
+      if (!existing) return refuse("not-found", "The dashboard has no such item.");
+      if (existing.revision !== row.expected_revision) return refuse("stale", "It was saved by someone else since you loaded it.");
+      const old = state.history.find((h) => h.template_id === row.template_id && h.revision === row.revision);
+      if (!old) return refuse("not-found", "The dashboard has no such item.");
+      const restored = { ...existing, name: old.name, body: old.body, pdf_sha256: old.pdf_sha256, pdf_file_name: old.pdf_file_name, pdf_bytes: old.pdf_bytes, pdf_pages: old.pdf_pages, revision: existing.revision + 1, updated_at: new Date().toISOString() };
+      state.templates.set(restored.template_id, restored);
+      state.history.push({ ...restored, saved_at: restored.updated_at, saved_by_you: true });
+      return { ok: true, result: { action: "restore", template_id: restored.template_id, name: restored.name, revision: restored.revision, restored_from: row.revision, updated_at: restored.updated_at } };
+    }
+
     if (row.action !== "save") return refuse("invalid", '"action" is missing or not valid.');
     if (!state.files.has(row.pdf_sha256)) return refuse("not-found", "The PDF file is not in the dashboard for this company. Send the file first, then save again.");
     if (!existing && row.expected_revision !== 0) return refuse("not-found", "The dashboard has no such item.");
@@ -138,6 +166,7 @@ export function createFakeHub(seed) {
     };
     state.corruptNextSave = false;
     state.templates.set(stored.template_id, stored);
+    state.history.push({ ...stored, saved_at: stored.updated_at, saved_by_you: true });
     return { ok: true, result: { action: "save", template_id: stored.template_id, name: stored.name, revision: stored.revision, updated_at: stored.updated_at } };
   }
 
@@ -148,6 +177,8 @@ export function createFakeHub(seed) {
     const command = isRequest ? payload.params || {} : (payload.rows || [])[0] || {};
     const { data: _data, ...withoutFile } = command;
     state.log.push({ kind: isRequest ? "request" : "save", dataType: payload.dataType, ...withoutFile, sentFile: "data" in command });
+
+    if (state.down) return { ok: false, code: "unavailable", error: "Can't reach the database." };
 
     if (!state.supported) {
       return { ok: false, error: `This app is not registered to ${isRequest ? "receive" : "send"} this kind of data.` };

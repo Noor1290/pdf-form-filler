@@ -471,6 +471,40 @@ export async function walkThrough(app, visit) {
   await snap(tool, "dashboard templates: fill-in screen");
   await tool.getByRole("button", { name: "Back to templates" }).click();
 
+  // History: the saved versions, one of them looked at, and a restore. The stand-in
+  // dashboard's clock is held still so the dates shown are the same on every run.
+  await hubPage.evaluate(() => {
+    const RealDate = Date;
+    const fixed = new RealDate("2026-10-13T08:05:00.000Z").getTime();
+    window.Date = class extends RealDate {
+      constructor(...args) {
+        if (args.length > 0) super(...args);
+        else super(fixed);
+      }
+      static now() {
+        return fixed;
+      }
+    };
+    for (const kept of window.hub.state.history) kept.saved_at = `2026-10-0${Math.min(kept.revision, 9)}T08:00:00.000Z`;
+  });
+  await renameTo(tool, "Dashboard Form", "Dashboard Form Renamed");
+  await savedThere(tool);
+  await row(tool, "Dashboard Form Renamed").getByRole("button", { name: "History" }).click();
+  await dialog(tool).getByRole("list", { name: "Saved versions" }).waitFor();
+  await snap(tool, "dashboard templates: history");
+  await dialog(tool).getByRole("button", { name: /^Revision 1/ }).click();
+  await dialog(tool).getByText("Revision 1:").waitFor();
+  await tool.waitForFunction(() => (document.querySelector('[role="dialog"] canvas')?.width ?? 0) > 310);
+  await snap(tool, "dashboard templates: history, a version shown");
+  await inDialog(tool, "Restore this version");
+  await snap(tool, "dashboard templates: history, restore question");
+  await inDialog(tool, "Restore");
+  await dialog(tool).getByText("Restored.").waitFor();
+  await snap(tool, "dashboard templates: history, restored");
+  await inDialog(tool, "Close");
+  await closed(tool);
+  await row(tool, "Dashboard Form").first().waitFor();
+
   // The dashboard switches to another company.
   await hubPage.evaluate((other) => {
     window.hub.state.brn = "C7654321";
@@ -499,13 +533,32 @@ export async function walkThrough(app, visit) {
   await inDialog(viewer.frame, "OK");
   await closed(viewer.frame);
 
-  // The dashboard cannot be reached when the tool opens.
+  await viewer.frame.getByRole("button", { name: "History" }).click();
+  await dialog(viewer.frame).getByRole("button", { name: /^Revision 1/ }).click();
+  await dialog(viewer.frame).getByText("Only an admin of").waitFor();
+  await snap(viewer.frame, "dashboard templates: history, not an admin");
+  await inDialog(viewer.frame, "Close");
+  await closed(viewer.frame);
+
+  // The dashboard cannot be reached when the tool opens. The copy this browser kept when it
+  // last loaded the templates is given a fixed date, so the words are the same on every run.
+  await viewer.frame.evaluate(() => {
+    const key = "pdf-editor:dashboard-cache:C1234567";
+    localStorage.setItem(key, JSON.stringify({ ...JSON.parse(localStorage.getItem(key)), loadedAt: "2026-10-13T08:05:00.000Z" }));
+  });
   await viewer.page.evaluate(() => {
-    window.hub.state.failNext = { dataType: "pdf-template", action: "list", code: "unavailable", error: "The dashboard is not connected to a database." };
+    window.hub.state.down = true;
   });
   await viewer.frame.evaluate(() => location.reload());
   await viewer.frame.getByRole("button", { name: "Try again" }).waitFor();
   await snap(viewer.frame, "dashboard templates: could not be loaded");
+
+  // The offline copy: read-only, and it can still be filled in.
+  await viewer.frame.getByRole("button", { name: "Open the offline copy of ABC Co Ltd" }).click();
+  await viewer.frame.getByText("Offline: read-only copy from").waitFor();
+  await snap(viewer.frame, "offline copy: home");
+  await openFillScreen(viewer.frame, "Dashboard Form");
+  await snap(viewer.frame, "offline copy: fill-in screen");
   await viewer.context.close();
 
   // On its own again, after an import: which copy this is.

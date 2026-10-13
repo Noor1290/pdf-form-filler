@@ -307,6 +307,8 @@ test("store interface: only the browser store itself touches the browser's stora
   // theme.ts keeps the light/dark choice, which is a preference and not data.
   assert.deepEqual(filesMatching(/\b(localStorage|sessionStorage|indexedDB)\s*[.[]/), [
     "lib/browserData.ts",
+    // The last copy loaded from the dashboard, for when it cannot be reached.
+    "lib/dashboardCache.ts",
     // Inside the dashboard, the values last typed and the People list, and the
     // note of what was imported, stay in this browser.
     "lib/dashboardImport.ts",

@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Building2Icon,
   CopyIcon,
+  HistoryIcon,
   FileStackIcon,
   PencilIcon,
   PenLineIcon,
@@ -34,6 +35,10 @@ type TemplateListProps = {
   onRestored: () => void;
   // Inside the dashboard only: copy a template to another company.
   onCopyTemplate?: (id: string) => void;
+  // Inside the dashboard only: a template's saved versions.
+  onHistory?: (id: string) => void;
+  // The offline copy: templates can be opened to fill in, and nothing else.
+  readOnly?: boolean;
 };
 
 export function TemplateList({
@@ -46,6 +51,8 @@ export function TemplateList({
   onDeleteTemplate,
   onRestored,
   onCopyTemplate,
+  onHistory,
+  readOnly = false,
 }: TemplateListProps) {
   const [renaming, setRenaming] = useState<Template | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -81,11 +88,13 @@ export function TemplateList({
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          <BackupControls
-            canBackUp={templates.length > 0}
-            onRestored={onRestored}
-          />
-          {templates.length > 0 && (
+          {!readOnly && (
+            <BackupControls
+              canBackUp={templates.length > 0}
+              onRestored={onRestored}
+            />
+          )}
+          {!readOnly && templates.length > 0 && (
             <Button onClick={onNewTemplate}>
               <PlusIcon />
               New Template
@@ -101,14 +110,18 @@ export function TemplateList({
           </div>
           <div className="flex flex-col gap-1">
             <p className="text-base font-semibold text-fg">No templates yet</p>
-            <p className="text-sm text-muted">
-              Upload a PDF to create your first one.
-            </p>
+            {!readOnly && (
+              <p className="text-sm text-muted">
+                Upload a PDF to create your first one.
+              </p>
+            )}
           </div>
-          <Button className="mt-1" onClick={onNewTemplate}>
-            <UploadIcon />
-            Upload a PDF
-          </Button>
+          {!readOnly && (
+            <Button className="mt-1" onClick={onNewTemplate}>
+              <UploadIcon />
+              Upload a PDF
+            </Button>
+          )}
         </div>
       ) : (
         <ul className="flex flex-col gap-3">
@@ -127,16 +140,22 @@ export function TemplateList({
                   <FileStackIcon className="size-5" />
                 </span>
                 <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="truncate font-semibold text-fg">
-                  {template.name}
-                </span>
-                <span className="text-sm text-muted tabular-nums">
-                  Last updated{" "}
-                  {new Date(template.updatedAt).toLocaleDateString()}
-                </span>
+                  <span className="truncate font-semibold text-fg">
+                    {template.name}
+                  </span>
+                  <span className="text-sm text-muted tabular-nums">
+                    Last updated{" "}
+                    {new Date(template.updatedAt).toLocaleDateString()}
+                  </span>
                 </span>
               </button>
-              <div className="flex max-w-full flex-wrap gap-2">
+              {/* The offline copy opens to fill in, and nothing else. */}
+              <div
+                className={
+                  readOnly ? "hidden" : "flex max-w-full flex-wrap gap-2"
+                }
+                hidden={readOnly}
+              >
                 <Button
                   variant="outline"
                   size="sm"
@@ -159,6 +178,15 @@ export function TemplateList({
                 >
                   <PencilIcon /> Rename
                 </Button>
+                {onHistory && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onHistory(template.id)}
+                  >
+                    <HistoryIcon /> History
+                  </Button>
+                )}
                 {onCopyTemplate && (
                   <Button
                     variant="outline"
@@ -214,8 +242,8 @@ export function TemplateList({
           <DialogHeader icon={<Trash2Icon />} tone="danger">
             <DialogTitle>Delete template?</DialogTitle>
             <DialogDescription>
-              This will permanently delete "{deleting?.name}" and all its
-              saved fields. This can't be undone.
+              This will permanently delete "{deleting?.name}" and all its saved
+              fields. This can't be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
