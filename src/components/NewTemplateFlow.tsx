@@ -57,9 +57,14 @@ export function NewTemplateFlow({
         pdfData,
       });
       onCreated(template);
-    } catch {
+    } catch (problem) {
+      // The dashboard store says why when the PDF is too large for it.
+      const tooLarge =
+        problem instanceof Error && problem.message.startsWith("This PDF is larger");
       setError(
-        "Something went wrong saving this template. Please try again.",
+        tooLarge
+          ? problem.message
+          : "Something went wrong saving this template. Please try again.",
       );
       setSaving(false);
     }

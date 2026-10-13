@@ -23,12 +23,23 @@ A backup file holds whatever was typed into the forms, people's details included
 
 Screens never touch the browser's storage themselves. They call the operations in `src/lib/templateStore.ts`, and a store carries them out. Today the only store is the browser (`src/lib/template.ts`, `src/lib/employerProfile.ts`), so the tool behaves as it always has. Saving through the Payroll Hub dashboard (see `docs/MIGRATION_PLAN.md` in the payroll_hub repository) will be a second store with the same operations.
 
+## Inside the dashboard
+
+Opened inside the Payroll Hub dashboard, the tool keeps its templates in the dashboard's database and their PDFs in its Storage bucket, for the company selected there (`src/lib/dashboardStore.ts`; the wire contract is the hub's `docs/INTEGRATION.md`). Opened on its own it uses this browser, exactly as before.
+
+- A change is saved by itself a moment after it is made. The bar at the top says "Saved", "Saving…" or "NOT saved", with the reason and what to do.
+- The values typed into a form and the People list are never sent: they stay in this browser.
+- "Copy to another company" copies a template and its PDF to another company the user is an admin of.
+- "Import to the dashboard" copies this browser's templates there, once, after a backup. This browser's copy is kept as it is; on its own the tool then says "This browser only. Not the dashboard's copy."
+- With a dashboard that does not keep templates yet, the tool uses this browser.
+
 ## Checks
 
 ```bash
 npm test                # the safety net
 npm run test:audit      # the audit
 npm run test:storage    # the backup file, the store interface, the bridge's "activity" message
+npm run test:dashboard  # templates kept in the dashboard: saving, copying, importing (stand-in dashboard)
 npm run check:text; npm run check:a11y; npm run check:preview; npm run check:build; npm run check:encoding
 npm run lint; npx tsc -b
 ```

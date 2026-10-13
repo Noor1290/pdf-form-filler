@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Building2Icon,
+  CopyIcon,
   FileStackIcon,
   PencilIcon,
   PenLineIcon,
@@ -31,6 +32,8 @@ type TemplateListProps = {
   onDeleteTemplate: (id: string) => void;
   // A backup file was restored: what the browser holds has been replaced.
   onRestored: () => void;
+  // Inside the dashboard only: copy a template to another company.
+  onCopyTemplate?: (id: string) => void;
 };
 
 export function TemplateList({
@@ -42,6 +45,7 @@ export function TemplateList({
   onRenameTemplate,
   onDeleteTemplate,
   onRestored,
+  onCopyTemplate,
 }: TemplateListProps) {
   const [renaming, setRenaming] = useState<Template | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -155,6 +159,15 @@ export function TemplateList({
                 >
                   <PencilIcon /> Rename
                 </Button>
+                {onCopyTemplate && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onCopyTemplate(template.id)}
+                  >
+                    <CopyIcon /> Copy to another company
+                  </Button>
+                )}
                 <Button
                   variant="destructive"
                   size="sm"

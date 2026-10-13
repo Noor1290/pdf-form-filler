@@ -4,8 +4,8 @@ interface PayrollHubPayload {
   meta?: { period?: string; label?: string };
 }
 type PayrollHubReply =
-  | ({ ok: true } & Partial<PayrollHubPayload>)
-  | { ok: false; error: string };
+  | ({ ok: true; result?: Record<string, unknown> } & Partial<PayrollHubPayload>)
+  | { ok: false; error: string; code?: string };
 interface Window {
   PayrollHubBridge: {
     isEmbedded(): boolean;

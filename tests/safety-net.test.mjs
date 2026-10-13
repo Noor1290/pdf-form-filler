@@ -393,7 +393,7 @@ test(
     await frame.getByRole("button", { name: "Get from dashboard" }).click();
     await frame.locator(NOTICE).waitFor();
     recording.noticeAfterGetFromDashboard = await collectStrings(frame, NOTICE);
-    const request = await hubWait(() => window.hub.received.find((m) => m.message.type === "request-data"));
+    const request = await hubWait(() => window.hub.received.find((m) => m.message.type === "request-data" && m.message.payload.dataType === "payroll-result"));
     recording.requestSentToDashboard = { type: request.message.type, payload: request.message.payload };
 
     await page.evaluate(() => {

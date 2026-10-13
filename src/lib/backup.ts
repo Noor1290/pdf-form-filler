@@ -5,6 +5,7 @@ import {
   readBrowserData,
   replaceBrowserData,
 } from "@/lib/browserData";
+import { EMPLOYER_STORAGE_KEYS } from "@/lib/employerProfile";
 import { TEMPLATES_STORAGE_KEY } from "@/lib/template";
 
 // Full backup of everything this tool keeps in the browser, as one JSON
@@ -212,8 +213,8 @@ export function summarizeBackup(backup: Backup): BackupSummary {
       fields: Array.isArray(template.boxes) ? template.boxes.length : 0,
       people: Array.isArray(template.entries) ? template.entries.length : 0,
     })),
-    hasEarlierCompanyDetails: Object.keys(backup.stored).some(
-      (key) => key !== TEMPLATES_STORAGE_KEY,
+    hasEarlierCompanyDetails: Object.keys(backup.stored).some((key) =>
+      (EMPLOYER_STORAGE_KEYS as readonly string[]).includes(key),
     ),
     unreadableCount: Object.keys(backup.unreadable).length,
   };

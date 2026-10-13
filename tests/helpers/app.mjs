@@ -27,7 +27,16 @@ function standinHtml(appUrl, appOrigin) {
   window.addEventListener("message", (event) => {
     if (event.source !== frame.contentWindow) return;
     window.hub.received.push({ origin: event.origin, message: event.data });
-    if (event.data.type === "request-data" && window.hub.requestReply) {
+    const asked = event.data.type === "request-data" ? event.data.payload.dataType : null;
+    if (asked === "pdf-template" || asked === "pdf-file") {
+      // This stand-in is the dashboard as deployed before it kept templates:
+      // it turns those two data types away at once, with these words.
+      window.hub.send(
+        "response-data",
+        { ok: false, error: "This app is not registered to receive this kind of data." },
+        event.data.id,
+      );
+    } else if (asked && window.hub.requestReply) {
       window.hub.send("response-data", window.hub.requestReply, event.data.id);
     }
   });

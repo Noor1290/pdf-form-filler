@@ -8,9 +8,18 @@ import { TEMPLATES_STORAGE_KEY } from "@/lib/template";
 //
 // Used by the full backup (see backup.ts), which reads all of it and can
 // replace all of it.
+// Inside the dashboard the templates themselves are in its database. What
+// stays in this browser then: the values last typed and the People list of
+// each dashboard template, and a note of which browser templates were
+// imported (names, ids and dates).
+export const DASHBOARD_VALUES_KEY = "pdf-editor:dashboard-values";
+export const IMPORTED_KEY = "pdf-editor:imported";
+
 export const BROWSER_DATA_KEYS: readonly string[] = [
   TEMPLATES_STORAGE_KEY,
   ...EMPLOYER_STORAGE_KEYS,
+  DASHBOARD_VALUES_KEY,
+  IMPORTED_KEY,
 ];
 
 export type BrowserData = Record<string, string>;

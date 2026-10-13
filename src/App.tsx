@@ -1,21 +1,44 @@
-import { useCallback, useEffect, useState } from "react";
-import { CircleAlertIcon, DownloadIcon, FileTextIcon } from "lucide-react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  CircleAlertIcon,
+  DownloadIcon,
+  FileTextIcon,
+  HardDriveIcon,
+} from "lucide-react";
 import { BoxEditor } from "@/components/BoxEditor";
 import { CompanyDetailsPanel } from "@/components/CompanyDetailsPanel";
+import { CopyToCompanyDialog } from "@/components/CopyToCompanyDialog";
+import { DashboardBar } from "@/components/DashboardBar";
 import { DashboardDataNotice } from "@/components/DashboardDataNotice";
 import { FieldForm } from "@/components/FieldForm";
+import { ImportToDashboard } from "@/components/ImportToDashboard";
 import { NewTemplateFlow } from "@/components/NewTemplateFlow";
 import { SaveFailedDialog } from "@/components/SaveFailedDialog";
 import { TemplateList } from "@/components/TemplateList";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
+import { readImported, templatesNotImported } from "@/lib/dashboardImport";
+import {
+  connectDashboard,
+  dashboardCompany,
+  dashboardLoadProblems,
+  dashboardStatus,
+  dashboardStore,
+} from "@/lib/dashboardStore";
 import { readDashboardPayroll, type DashboardPayroll } from "@/lib/payrollHub";
-import { templateStore } from "@/lib/templateStore";
+import { setTemplateStore, templateStore } from "@/lib/templateStore";
 import type { Template } from "@/types/template";
 
 // Every read and save goes through the template store (lib/templateStore.ts).
 const { deleteTemplate, getTemplate, listTemplates, renameTemplate } =
   templateStore;
+
+// Where the templates are kept. On its own the tool always uses this
+// browser. Inside the dashboard it asks the dashboard first: "starting"
+// while it waits, "dashboard" once the templates are loaded from there,
+// "failed" when they could not be, and "browser" when the dashboard is an
+// older one that does not keep templates yet.
+type Kept = "browser" | "starting" | "dashboard" | "failed";
 
 type View =
   | { name: "home" }
@@ -26,9 +49,7 @@ type View =
 
 function App() {
   const [view, setView] = useState<View>({ name: "home" });
-  const [templates, setTemplates] = useState<Template[]>(() =>
-    listTemplates(),
-  );
+  const [templates, setTemplates] = useState<Template[]>(() => listTemplates());
 
   // A rename or delete the browser refused to store (see SaveFailedDialog).
   const [saveFailed, setSaveFailed] = useState(false);
@@ -36,6 +57,36 @@ function App() {
   function refreshTemplates() {
     setTemplates(listTemplates());
   }
+
+  const [kept, setKept] = useState<Kept>(
+    window.PayrollHubBridge.isEmbedded() ? "starting" : "browser",
+  );
+  const [startProblem, setStartProblem] = useState("");
+  // The template being copied to another company, if any.
+  const [copying, setCopying] = useState<Template | null>(null);
+  // True while the import dialog is open, so it can show its results.
+  const [importOpen, setImportOpen] = useState(false);
+  // Redrawn whenever a save to the dashboard starts, lands or fails.
+  const saving = useSyncExternalStore(
+    dashboardStatus.subscribe,
+    dashboardStatus.get,
+  );
+
+  const loadFromDashboard = useCallback(async () => {
+    setKept("starting");
+    const result = await connectDashboard();
+    if (result.ok) {
+      setTemplateStore(dashboardStore);
+      setKept("dashboard");
+      setView({ name: "home" });
+      setTemplates(templateStore.listTemplates());
+    } else if (result.code === "not-supported") {
+      setKept("browser");
+    } else {
+      setStartProblem(result.error);
+      setKept("failed");
+    }
+  }, []);
 
   // Everything below only ever does something inside the Payroll Hub
   // dashboard's frame: opened on its own, the bridge stays silent, nothing
@@ -66,8 +117,23 @@ function App() {
   );
 
   useEffect(() => {
-    window.PayrollHubBridge.init({ appId: "pdf-editor", onData: receivePayroll });
+    window.PayrollHubBridge.init({
+      appId: "pdf-editor",
+      onData: receivePayroll,
+    });
   }, [receivePayroll]);
+
+  // Inside the dashboard, the templates come from there. (After the bridge
+  // has started, above: it carries the question.)
+  useEffect(() => {
+    if (window.PayrollHubBridge.isEmbedded()) void loadFromDashboard();
+  }, [loadFromDashboard]);
+
+  // A save that failed can put a template back in the list, and loading
+  // another version changes one: the list follows.
+  useEffect(() => {
+    if (kept === "dashboard") setTemplates(templateStore.listTemplates());
+  }, [kept, saving]);
 
   async function handleGetFromDashboard() {
     setRequesting(true);
@@ -122,6 +188,19 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
+  // The templates can be shown and worked on: not while they are still
+  // being loaded from the dashboard, and not when that failed.
+  const usable = kept === "browser" || kept === "dashboard";
+  const company = kept === "dashboard" ? dashboardCompany() : null;
+  // This browser's own templates that the dashboard does not have yet.
+  const notImported =
+    kept === "dashboard" && view.name === "home"
+      ? templatesNotImported().length
+      : 0;
+  // On its own, after an import: say plainly which copy this is.
+  const importedBefore =
+    kept === "browser" && Object.keys(readImported()).length > 0;
+
   // The import preview lives on a template's fill-in screen, and only once
   // that template has fields to import into.
   const canPreviewHere =
@@ -156,14 +235,16 @@ function App() {
           </h1>
           <div className="ml-auto flex items-center gap-2">
             {insideDashboard && (
-            <Button
-              variant="outline"
-              onClick={handleGetFromDashboard}
-              disabled={requesting}
-            >
-              <DownloadIcon />
-              {requesting ? "Waiting for the dashboard…" : "Get from dashboard"}
-            </Button>
+              <Button
+                variant="outline"
+                onClick={handleGetFromDashboard}
+                disabled={requesting}
+              >
+                <DownloadIcon />
+                {requesting
+                  ? "Waiting for the dashboard…"
+                  : "Get from dashboard"}
+              </Button>
             )}
             <ThemeToggle />
           </div>
@@ -172,7 +253,10 @@ function App() {
 
       <main className="flex flex-1 flex-col items-center gap-6 px-4 py-8 sm:px-6">
         {dashboardError && (
-          <p role="alert" className="notice-panel notice-danger w-full max-w-2xl">
+          <p
+            role="alert"
+            className="notice-panel notice-danger w-full max-w-2xl"
+          >
             <CircleAlertIcon />
             {dashboardError}
           </p>
@@ -192,7 +276,63 @@ function App() {
           />
         )}
 
-        {view.name === "home" && (
+        {kept === "starting" && (
+          <p role="status" className="text-sm text-muted">
+            Loading the templates from the dashboard…
+          </p>
+        )}
+
+        {kept === "failed" && (
+          <div
+            role="alert"
+            className="notice-panel notice-danger w-full max-w-2xl flex-wrap items-center"
+          >
+            <CircleAlertIcon />
+            <span className="min-w-48 flex-1">
+              The templates could not be loaded from the dashboard.{" "}
+              {startProblem} Nothing was changed. The templates kept in this
+              browser can still be used by opening this tool on its own, in a
+              new tab.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void loadFromDashboard()}
+            >
+              Try again
+            </Button>
+          </div>
+        )}
+
+        {kept === "dashboard" && company && (
+          <DashboardBar
+            company={company}
+            loadProblems={dashboardLoadProblems()}
+            wide={view.name === "fill" || view.name === "edit-boxes"}
+            onReload={() => void loadFromDashboard()}
+          />
+        )}
+
+        {kept === "dashboard" &&
+          company?.role === "admin" &&
+          view.name === "home" &&
+          (notImported > 0 || importOpen) && (
+            <ImportToDashboard
+              waiting={notImported}
+              companyName={company.label}
+              onImported={refreshTemplates}
+              onOpenChange={setImportOpen}
+            />
+          )}
+
+        {kept === "browser" && view.name === "home" && importedBefore && (
+          <p className="notice-panel notice-warn w-full max-w-4xl">
+            <HardDriveIcon />
+            This browser only. Not the dashboard's copy.
+          </p>
+        )}
+
+        {usable && view.name === "home" && (
           <TemplateList
             templates={templates}
             onNewTemplate={() => setView({ name: "new" })}
@@ -213,17 +353,22 @@ function App() {
               refreshTemplates();
             }}
             onRestored={refreshTemplates}
+            onCopyTemplate={
+              kept === "dashboard"
+                ? (id) => setCopying(getTemplate(id) ?? null)
+                : undefined
+            }
           />
         )}
 
-        {view.name === "company-details" && activeTemplate && (
+        {usable && view.name === "company-details" && activeTemplate && (
           <CompanyDetailsPanel
             template={activeTemplate}
             onBack={() => setView({ name: "home" })}
           />
         )}
 
-        {view.name === "new" && (
+        {usable && view.name === "new" && (
           <NewTemplateFlow
             onCreated={(template) => {
               refreshTemplates();
@@ -233,14 +378,14 @@ function App() {
           />
         )}
 
-        {view.name === "edit-boxes" && activeTemplate && (
+        {usable && view.name === "edit-boxes" && activeTemplate && (
           <BoxEditor
             template={activeTemplate}
             onBack={() => setView({ name: "home" })}
           />
         )}
 
-        {view.name === "fill" && activeTemplate && (
+        {usable && view.name === "fill" && activeTemplate && (
           <FieldForm
             template={activeTemplate}
             onBack={() => setView({ name: "home" })}
@@ -253,6 +398,11 @@ function App() {
           />
         )}
       </main>
+
+      <CopyToCompanyDialog
+        template={copying}
+        onClose={() => setCopying(null)}
+      />
 
       <SaveFailedDialog
         open={saveFailed}

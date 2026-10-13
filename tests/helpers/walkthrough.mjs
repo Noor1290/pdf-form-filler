@@ -1,6 +1,8 @@
 // One walk through every screen and dialog of the app, with fake data.
 // Shared by the visible-text check (which records the words at each stop)
 // and the accessibility check (which measures contrast at each stop).
+import { createHash } from "node:crypto";
+import { openTemplatesStandin } from "./fake-hub.mjs";
 import {
   STANDIN_URL,
   fillStorage,
@@ -341,7 +343,7 @@ export async function walkThrough(app, visit) {
   await snap(frame, "in dashboard: waiting for an answer");
   const requestId = await outer
     .waitForFunction(
-      () => window.hub.received.find((m) => m.message.type === "request-data")?.message.id,
+      () => window.hub.received.find((m) => m.message.type === "request-data" && m.message.payload.dataType === "payroll-result")?.message.id,
     )
     .then((handle) => handle.jsonValue());
   await outer.evaluate(
@@ -380,5 +382,149 @@ export async function walkThrough(app, visit) {
   const outside = embedded.outsideRequests;
   if (outside.length > 0) {
     throw new Error(`The app tried to reach outside servers: ${outside.join(", ")}`);
+  }
+
+  // ---------------- inside a dashboard that keeps the templates ----------------
+  const sha = createHash("sha256").update(pdf).digest("hex");
+  const heldTemplate = (more = {}) => ({
+    template_id: "20000000-0000-4000-8000-000000000001",
+    name: "Dashboard Form",
+    revision: 1,
+    body: { boxes: makeTemplate(pdf).boxes, employerFields: COMPANY_DETAILS },
+    pdf_sha256: sha,
+    pdf_file_name: "fake-form.pdf",
+    pdf_bytes: pdf.length,
+    pdf_pages: 1,
+    updated_at: "2026-10-01T08:00:00.000Z",
+    ...more,
+  });
+  const dashboardHolds = (more = {}) => ({
+    templates: [heldTemplate()],
+    files: { [sha]: pdf.toString("base64") },
+    ...more,
+  });
+  const inBrowser = {
+    "pdf-editor:templates": JSON.stringify([
+      makeTemplate(pdf, { id: "tpl-browser-one", name: "Browser Only Form" }),
+      makeTemplate(pdf, { id: "tpl-browser-two", name: "Dashboard Form", boxes: [] }),
+    ]),
+  };
+  const bar = (target) => target.getByRole("status").filter({ hasText: "kept in the dashboard" });
+  const savedThere = (target) => bar(target).getByText("Saved", { exact: true }).waitFor();
+  async function renameTo(target, from, to) {
+    await row(target, from).getByRole("button", { name: "Rename" }).click();
+    await dialog(target).getByRole("textbox").fill(to);
+    await inDialog(target, "Save");
+    await closed(target);
+  }
+
+  const kept = await openTemplatesStandin(app, dashboardHolds(), inBrowser);
+  const hubPage = kept.page;
+  const tool = kept.frame;
+  await bar(tool).waitFor();
+  await snap(tool, "dashboard templates: home, with templates to import");
+
+  await tool.getByRole("button", { name: "Copy to another company" }).click();
+  await dialog(tool).getByLabel("Company").waitFor();
+  await snap(tool, "dashboard templates: copy to another company");
+  await inDialog(tool, "Copy");
+  await dialog(tool).getByText("Copied to New Venture Ltd.").waitFor();
+  await snap(tool, "dashboard templates: copied");
+  await inDialog(tool, "OK");
+  await closed(tool);
+
+  await tool.getByRole("button", { name: "Import to the dashboard" }).click();
+  await dialog(tool).getByText("What will be imported").waitFor();
+  await snap(tool, "dashboard templates: import, before the backup");
+  const backupSaved = hubPage.waitForEvent("download");
+  await inDialog(tool, "Back up");
+  await backupSaved;
+  await dialog(tool).getByText("Backup downloaded.").waitFor();
+  await snap(tool, "dashboard templates: import, backup saved");
+  await inDialog(tool, "Import 1 template");
+  await dialog(tool).getByText("imported and checked.").waitFor();
+  await snap(tool, "dashboard templates: import results");
+  await inDialog(tool, "Done");
+  await closed(tool);
+
+  // A save the dashboard does not store, then one that someone else got in before.
+  await hubPage.evaluate(() => {
+    window.hub.state.failNext = { dataType: "pdf-template", action: "save", code: "unavailable", error: "Can't reach the database." };
+  });
+  await renameTo(tool, "Browser Only Form", "Form Not Saved Yet");
+  await bar(tool).getByText("NOT saved").waitFor();
+  await snap(tool, "dashboard templates: NOT saved");
+  await tool.getByRole("button", { name: "Try saving again" }).click();
+  await savedThere(tool);
+  await hubPage.evaluate(() => {
+    const held = [...window.hub.state.templates.values()].find((t) => t.name === "Form Not Saved Yet");
+    held.name = "Changed By Someone Else";
+    held.revision += 1;
+  });
+  await renameTo(tool, "Form Not Saved Yet", "My Own Change");
+  await tool.getByRole("button", { name: "Use the dashboard's version" }).waitFor();
+  await snap(tool, "dashboard templates: someone else saved meanwhile");
+  await tool.getByRole("button", { name: "Use the dashboard's version" }).click();
+  await savedThere(tool);
+
+  await openFillScreen(tool, "Changed By Someone Else");
+  await snap(tool, "dashboard templates: fill-in screen");
+  await tool.getByRole("button", { name: "Back to templates" }).click();
+
+  // The dashboard switches to another company.
+  await hubPage.evaluate((other) => {
+    window.hub.state.brn = "C7654321";
+    window.hub.state.label = "XYZ Trading Ltd";
+    window.hub.state.templates = new Map([[other.template_id, other]]);
+  }, heldTemplate({ template_id: "20000000-0000-4000-8000-000000000002", name: "Other Company Form" }));
+  await renameTo(tool, "Changed By Someone Else", "For The Wrong Company");
+  await tool.getByRole("button", { name: "Load that company's templates" }).waitFor();
+  await snap(tool, "dashboard templates: the dashboard shows another company");
+  await kept.context.close();
+
+  // Someone who is not an admin, with a template whose PDF is missing, and nowhere to copy to.
+  const viewer = await openTemplatesStandin(
+    app,
+    dashboardHolds({
+      role: "member",
+      others: [],
+      templates: [heldTemplate(), heldTemplate({ template_id: "20000000-0000-4000-8000-000000000003", name: "Lost Form", pdf_sha256: "c".repeat(64) })],
+    }),
+  );
+  await bar(viewer.frame).waitFor();
+  await snap(viewer.frame, "dashboard templates: not an admin, and a PDF is missing");
+  await viewer.frame.getByRole("button", { name: "Copy to another company" }).click();
+  await dialog(viewer.frame).getByText("You are not an admin of any other company").waitFor();
+  await snap(viewer.frame, "dashboard templates: no other company to copy to");
+  await inDialog(viewer.frame, "OK");
+  await closed(viewer.frame);
+
+  // The dashboard cannot be reached when the tool opens.
+  await viewer.page.evaluate(() => {
+    window.hub.state.failNext = { dataType: "pdf-template", action: "list", code: "unavailable", error: "The dashboard is not connected to a database." };
+  });
+  await viewer.frame.evaluate(() => location.reload());
+  await viewer.frame.getByRole("button", { name: "Try again" }).waitFor();
+  await snap(viewer.frame, "dashboard templates: could not be loaded");
+  await viewer.context.close();
+
+  // On its own again, after an import: which copy this is.
+  const alone = await app.newContext();
+  const alonePage = await alone.context.newPage();
+  await alonePage.goto(app.appUrl);
+  await alonePage.getByText("Your templates").waitFor();
+  await seedTemplates(alonePage, [makeTemplate(pdf)], {
+    "pdf-editor:imported": JSON.stringify({
+      "tpl-fake-form": { dashboardId: "20000000-0000-4000-8000-000000000001", brn: "C1234567", company: "ABC Co Ltd", name: "Fake Form", revision: 1, importedAt: "2026-10-13T08:00:00.000Z" },
+    }),
+  });
+  await alonePage.getByText("This browser only. Not the dashboard's copy.").waitFor();
+  await snap(alonePage, "home: this browser only, after an import");
+  await alone.context.close();
+
+  for (const requests of [kept.outsideRequests, viewer.outsideRequests, alone.outsideRequests]) {
+    if (requests.length > 0) {
+      throw new Error(`The app tried to reach outside servers: ${requests.join(", ")}`);
+    }
   }
 }

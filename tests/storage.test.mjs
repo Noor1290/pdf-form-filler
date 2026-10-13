@@ -307,18 +307,25 @@ test("store interface: only the browser store itself touches the browser's stora
   // theme.ts keeps the light/dark choice, which is a preference and not data.
   assert.deepEqual(filesMatching(/\b(localStorage|sessionStorage|indexedDB)\s*[.[]/), [
     "lib/browserData.ts",
+    // Inside the dashboard, the values last typed and the People list, and the
+    // note of what was imported, stay in this browser.
+    "lib/dashboardImport.ts",
+    "lib/dashboardStore.ts",
     "lib/employerProfile.ts",
     "lib/template.ts",
     "lib/theme.ts",
   ]);
-  // backup.ts and browserData.ts are the browser's own copy by definition.
+  // backup.ts and browserData.ts are the browser's own copy by definition, and
+  // the import reads this browser's templates to copy them to the dashboard.
   assert.deepEqual(filesMatching(/from\s+"@\/lib\/template"/), [
     "lib/backup.ts",
     "lib/browserData.ts",
+    "lib/dashboardImport.ts",
     "lib/templateStore.ts",
   ]);
   assert.deepEqual(filesMatching(/\bgetLegacyEmployerFields\b/), [
     "components/CompanyDetailsPanel.tsx",
+    "lib/dashboardStore.ts",
     "lib/employerProfile.ts",
     "lib/templateStore.ts",
   ]);
