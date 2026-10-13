@@ -43,11 +43,7 @@ import {
 } from "@/lib/pdf";
 import type { DashboardPayroll } from "@/lib/payrollHub";
 import { resizeHandleStyles } from "@/lib/rndHandleStyles";
-import {
-  saveTemplateBoxes,
-  saveTemplateEntries,
-  saveTemplateValues,
-} from "@/lib/template";
+import { templateStore } from "@/lib/templateStore";
 import { validateFieldValue } from "@/lib/validation";
 import type {
   EmployerField,
@@ -55,6 +51,9 @@ import type {
   Template,
   TemplateEntry,
 } from "@/types/template";
+
+const { saveTemplateBoxes, saveTemplateEntries, saveTemplateValues } =
+  templateStore;
 
 type FieldFormProps = {
   template: Template;

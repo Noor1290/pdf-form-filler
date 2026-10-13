@@ -259,6 +259,67 @@ export async function walkThrough(app, visit) {
   await snap(page, "home: NOT saved warning");
   await inDialog(page, "OK");
   await closed(page);
+
+  // Back up and Restore. The storage is still full here, so the first
+  // restore is refused; then room is made and it goes through.
+  const backupFile = (content) => ({
+    name: "pdf-form-filler-backup-2026-10-13.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(typeof content === "string" ? content : JSON.stringify(content)),
+  });
+  const people = (count) =>
+    Array.from({ length: count }, (_, index) => ({
+      id: `entry-${index + 1}`,
+      values: { "f-surname": `Sampleton ${index + 1}`, "f-other": "Fake Person" },
+    }));
+  const fakeBackup = {
+    _meta: { app: "pdf-form-filler-backup", version: 1, exportedAt: "2026-10-13T08:05:00.000Z" },
+    stored: {
+      "pdf-editor:templates": [
+        makeTemplate(pdf, { employerFields: COMPANY_DETAILS, entries: people(400) }),
+        makeTemplate(pdf, { id: "tpl-one-field", name: "One Field Form", boxes: [makeTemplate(pdf).boxes[0]], entries: people(1) }),
+      ],
+      "pdf-editor:employer-fields": COMPANY_DETAILS,
+    },
+    unreadable: { "pdf-editor:employer-profile": '{"companyName":' },
+  };
+  const chooseBackup = (content) =>
+    page.locator('input[type="file"][accept=".json,application/json"]').setInputFiles(backupFile(content));
+
+  await chooseBackup(fakeBackup);
+  await dialog(page).getByText("Restore this backup?").waitFor();
+  await snap(page, "restore: what is in the file and in the browser");
+  await inDialog(page, "Replace with this backup");
+  await dialog(page).getByText("The backup was NOT restored").waitFor();
+  await snap(page, "restore: NOT restored, storage full");
+  await inDialog(page, "OK");
+  await closed(page);
+
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("zz_test_fill_")) localStorage.removeItem(key);
+    }
+  });
+  await chooseBackup("just some notes, not a backup");
+  await dialog(page).getByText("This file cannot be restored").waitFor();
+  await snap(page, "restore: a file that is not a backup");
+  await inDialog(page, "OK");
+  await closed(page);
+
+  await chooseBackup({ ...fakeBackup, _meta: { ...fakeBackup._meta, version: 2 } });
+  await dialog(page).getByText("This file cannot be restored").waitFor();
+  await snap(page, "restore: a backup of another version");
+  await inDialog(page, "OK");
+  await closed(page);
+
+  await chooseBackup(fakeBackup);
+  await dialog(page).getByText("Restore this backup?").waitFor();
+  await inDialog(page, "Replace with this backup");
+  await dialog(page).getByText("Backup restored").waitFor();
+  await snap(page, "restore: backup restored");
+  await inDialog(page, "OK");
+  await closed(page);
+  await row(page, "One Field Form").waitFor();
   await context.close();
 
   // ---------------- inside the stand-in dashboard ----------------

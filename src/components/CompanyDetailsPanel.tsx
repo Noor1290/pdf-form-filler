@@ -11,9 +11,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { DEFAULT_FIELDS, getLegacyEmployerFields } from "@/lib/employerProfile";
-import { saveTemplateEmployerFields } from "@/lib/template";
+import { DEFAULT_FIELDS } from "@/lib/employerProfile";
+import { templateStore } from "@/lib/templateStore";
 import type { EmployerField, Template } from "@/types/template";
+
+const { getLegacyEmployerFields, saveTemplateEmployerFields } = templateStore;
 
 type CompanyDetailsPanelProps = {
   template: Template;

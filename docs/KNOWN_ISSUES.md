@@ -96,6 +96,40 @@ rename dialog to be gone before recording that screen.
 src/components/BoxEditor.tsx read the name from the same state that closes
 the dialog.
 
+## 8. The People list can miss the last key when the page is reloaded in the same instant
+
+**Where:** the fill-in screen, with a person from the People list in the form.
+
+**What happens:** a value typed for a listed person reaches the form at once
+and the People list a moment later (a second pass of the screen, a few
+thousandths of a second after the key). If the page is closed or reloaded
+inside that moment, the value is stored for the form but the listed person is
+stored without it. Nothing warns. A person cannot press reload that fast; a
+test can.
+
+**Evidence (13 October 2026, fake data):** the audit test "what is typed in
+the last moment before leaving the fill-in screen is saved: Back to templates,
+Edit fields and a reload" types a TAN for Person 2 and reloads at once. Its
+last check ("and in the listed person it was typed for") found the TAN missing
+in 6 of 11 runs of that test alone on the code as committed before that day's
+work, and in 7 of 11 with that work in place, so the work did not cause it.
+The whole audit (28 tests) passed in 2 of 2 runs on the earlier code; with the
+work in place it failed twice, on this test and the one below, and passed the
+third time. On 12 October it passed; the machine was busier on the 13th. The
+form's own value ("the TAN typed just before the reload") was stored every
+time.
+
+**Also seen that day, in those same two runs:** "when storage is full, what is
+typed just before "Back to templates" is not dropped unseen" failed because
+the "NOT saved" warning opened before the test's click, which the warning then
+covered. The 0.4 second wait before a save had already run out. It passed
+when run again.
+
+**Possible fix:** when the screen is left or the page is closed, put the
+form's values into the listed person before the People list is stored, the
+way "Add & fill next person" and choosing another person already do. In
+src/components/FieldForm.tsx (`saveWhatIsWaiting`).
+
 # Fixed during the redesign
 
 Small behaviour changes made on purpose, each approved, because the redesign's

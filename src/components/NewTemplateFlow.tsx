@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PdfCanvas } from "@/components/PdfCanvas";
 import { fileToBase64, isPdfFile } from "@/lib/pdf";
-import { createTemplate } from "@/lib/template";
+import { templateStore } from "@/lib/templateStore";
 import type { Template } from "@/types/template";
+
+const { createTemplate } = templateStore;
 
 type NewTemplateFlowProps = {
   onCreated: (template: Template) => void;

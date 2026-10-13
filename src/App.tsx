@@ -10,13 +10,12 @@ import { TemplateList } from "@/components/TemplateList";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { readDashboardPayroll, type DashboardPayroll } from "@/lib/payrollHub";
-import {
-  deleteTemplate,
-  getTemplate,
-  listTemplates,
-  renameTemplate,
-} from "@/lib/template";
+import { templateStore } from "@/lib/templateStore";
 import type { Template } from "@/types/template";
+
+// Every read and save goes through the template store (lib/templateStore.ts).
+const { deleteTemplate, getTemplate, listTemplates, renameTemplate } =
+  templateStore;
 
 type View =
   | { name: "home" }
@@ -213,6 +212,7 @@ function App() {
               if (!deleteTemplate(id)) setSaveFailed(true);
               refreshTemplates();
             }}
+            onRestored={refreshTemplates}
           />
         )}
 

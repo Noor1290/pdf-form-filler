@@ -8,6 +8,7 @@ import {
   Trash2Icon,
   UploadIcon,
 } from "lucide-react";
+import { BackupControls } from "@/components/BackupControls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,6 +29,8 @@ type TemplateListProps = {
   onCompanyDetails: (id: string) => void;
   onRenameTemplate: (id: string, name: string) => void;
   onDeleteTemplate: (id: string) => void;
+  // A backup file was restored: what the browser holds has been replaced.
+  onRestored: () => void;
 };
 
 export function TemplateList({
@@ -38,6 +41,7 @@ export function TemplateList({
   onCompanyDetails,
   onRenameTemplate,
   onDeleteTemplate,
+  onRestored,
 }: TemplateListProps) {
   const [renaming, setRenaming] = useState<Template | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -72,7 +76,11 @@ export function TemplateList({
             Pick a template to fill in, or create a new one.
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <BackupControls
+            canBackUp={templates.length > 0}
+            onRestored={onRestored}
+          />
           {templates.length > 0 && (
             <Button onClick={onNewTemplate}>
               <PlusIcon />

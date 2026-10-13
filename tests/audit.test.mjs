@@ -875,10 +875,14 @@ test("when storage is full, reloading the page in that last moment is held by th
   await context.close();
 });
 
-test("evidence (MISSING): there is no way to save a template to a file or load one, so templates cannot be backed up or moved to another browser", TIMEOUT, async () => {
+// Was "evidence (MISSING)" until 13 October 2026: there was no way to save a
+// template to a file or load one. What the two buttons do is tested in
+// tests/storage.test.mjs.
+test("templates can be saved to a file and loaded from one: the template list offers \"Back up\" and \"Restore\"", TIMEOUT, async () => {
   const pdf = await blankForm();
   const { context, page } = await openApp([template(pdf)]);
-  const buttons = await page.getByRole("button").allTextContents();
-  assert.ok(!buttons.some((b) => /export|backup|save to file|download template|import template/i.test(b)), buttons.join(" | "));
+  const buttons = (await page.getByRole("button").allTextContents()).map((b) => b.trim());
+  assert.ok(buttons.includes("Back up"), buttons.join(" | "));
+  assert.ok(buttons.includes("Restore"), buttons.join(" | "));
   await context.close();
 });

@@ -31,9 +31,11 @@ import {
   renderPdfPageToCanvas,
 } from "@/lib/pdf";
 import { resizeHandleStyles } from "@/lib/rndHandleStyles";
-import { saveTemplateBoxes } from "@/lib/template";
+import { templateStore } from "@/lib/templateStore";
 import { inferValidationType } from "@/lib/validation";
 import type { FieldBox, Template } from "@/types/template";
+
+const { saveTemplateBoxes } = templateStore;
 
 type BoxEditorProps = {
   template: Template;

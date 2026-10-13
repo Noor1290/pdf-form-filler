@@ -5,7 +5,8 @@ import type {
   TemplateEntry,
 } from "@/types/template";
 
-const STORAGE_KEY = "pdf-editor:templates";
+export const TEMPLATES_STORAGE_KEY = "pdf-editor:templates";
+const STORAGE_KEY = TEMPLATES_STORAGE_KEY;
 
 function readAll(): Template[] {
   const raw = localStorage.getItem(STORAGE_KEY);
