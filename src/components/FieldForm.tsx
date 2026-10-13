@@ -338,10 +338,34 @@ export function FieldForm({
     return recordSaves({ ...unsavedNow.current, entries: !saved });
   }
 
+  // The People list as last drawn, for the moments below that run outside a
+  // render (leaving the screen, closing the page).
+  const listNow = useRef({ entries, activeEntryId });
+  useEffect(() => {
+    listNow.current = { entries, activeEntryId };
+  }, [entries, activeEntryId]);
+
+  // A value typed for a listed person reaches the form at once and the
+  // People list one redraw later (the background backstop further down).
+  // Leaving in between must not store that person without the last key, so
+  // the list is brought level with the form first.
+  function bringPeopleListLevel() {
+    const typed = waitingToSave.current.values;
+    const { entries: drawn, activeEntryId: activeId } = listNow.current;
+    if (typed === undefined || activeId === null) return;
+    const list = waitingToSave.current.entries ?? drawn;
+    const active = list.find((entry) => entry.id === activeId);
+    if (!active || sameValues(active.values, typed)) return;
+    waitingToSave.current.entries = list.map((entry) =>
+      entry.id === activeId ? { ...entry, values: typed } : entry,
+    );
+  }
+
   // Stores at once whatever is still waiting. Says whether the "NOT saved"
   // warning was opened by it, that is, the browser refused and this is the
   // first the user hears of it.
   function saveWhatIsWaiting(templateId: string): boolean {
+    bringPeopleListLevel();
     const valuesJustRefused = saveWaitingValues(templateId);
     const entriesJustRefused = saveWaitingEntries(templateId);
     return valuesJustRefused || entriesJustRefused;

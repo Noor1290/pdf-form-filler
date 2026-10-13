@@ -835,7 +835,10 @@ test("when storage is full, what is typed just before \"Back to templates\" is n
   assert.equal(await page.getByRole("dialog").count(), 0);
 
   await page.getByLabel("ID", { exact: true }).fill("TST009");
-  await page.getByRole("button", { name: "Back to templates" }).click();
+  // Pressed in the page itself, with no wait: a click sent the usual way first
+  // watches the button for a moment, and on a busy machine that moment was
+  // longer than the 0.4 seconds this test has to stay inside.
+  await page.getByRole("button", { name: "Back to templates" }).evaluate((button) => button.click());
   const warning = page.getByRole("dialog");
   await warning.getByText("This was NOT saved").waitFor();
   assert.ok((await warning.textContent()).includes("you can still download the PDF now"), await warning.textContent());

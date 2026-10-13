@@ -96,7 +96,9 @@ rename dialog to be gone before recording that screen.
 src/components/BoxEditor.tsx read the name from the same state that closes
 the dialog.
 
-## 8. The People list can miss the last key when the page is reloaded in the same instant
+## 8. (Fixed) The People list could miss the last key when the page was reloaded in the same instant
+
+Fixed on 13 October 2026, the day it was found. On leaving the screen or closing the page, the People list is now brought level with the form before it is stored (`bringPeopleListLevel` in src/components/FieldForm.tsx). The audit test below then passed in every run. The second test named below was a matter of the test itself: its click is now made in the page with no wait. What follows is the record of the problem.
 
 **Where:** the fill-in screen, with a person from the People list in the form.
 
@@ -125,7 +127,7 @@ the "NOT saved" warning opened before the test's click, which the warning then
 covered. The 0.4 second wait before a save had already run out. It passed
 when run again.
 
-**Possible fix:** when the screen is left or the page is closed, put the
+**Fix as suggested then:** when the screen is left or the page is closed, put the
 form's values into the listed person before the People list is stored, the
 way "Add & fill next person" and choosing another person already do. In
 src/components/FieldForm.tsx (`saveWhatIsWaiting`).
