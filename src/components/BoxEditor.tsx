@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Rnd } from "react-rnd";
 import {
   CircleAlertIcon,
@@ -33,6 +33,7 @@ import {
 import { resizeHandleStyles } from "@/lib/rndHandleStyles";
 import { templateStore } from "@/lib/templateStore";
 import { inferValidationType } from "@/lib/validation";
+import { createDragClickGuard, hasMoved } from "@/lib/dragClick";
 import type { FieldBox, Template } from "@/types/template";
 
 const { saveTemplateBoxes } = templateStore;
@@ -71,7 +72,12 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
   const [pendingName, setPendingName] = useState("");
   const [deletingBox, setDeletingBox] = useState<FieldBox | null>(null);
   const [editingBoxId, setEditingBoxId] = useState<string | null>(null);
+  // The click that ends moving a field does not open its settings.
+  const dragGuard = useMemo(createDragClickGuard, []);
   const [renamingBox, setRenamingBox] = useState<FieldBox | null>(null);
+  // The name the rename dialog was opened for. Kept after it closes, so the
+  // dialog still names the field while it fades out (known issue 7).
+  const [renameLabel, setRenameLabel] = useState("");
   const [renameValue, setRenameValue] = useState("");
 
   useEffect(() => {
@@ -215,6 +221,7 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
 
   function startRenameBox(box: FieldBox) {
     setRenamingBox(box);
+    setRenameLabel(box.name);
     setRenameValue(box.name);
   }
 
@@ -330,13 +337,17 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
                       width: pixelRect.width,
                       height: pixelRect.height,
                     }}
-                    onDragStop={(_event, data) =>
+                    onDragStop={(_event, data) => {
+                      dragGuard.dragStopped(
+                        box.id,
+                        hasMoved(pixelRect.x, pixelRect.y, data.x, data.y),
+                      );
                       updateBoxRect(box.id, {
                         ...pixelRect,
                         x: data.x,
                         y: data.y,
-                      })
-                    }
+                      });
+                    }}
                     onResizeStop={(
                       _event,
                       _direction,
@@ -356,7 +367,9 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
                   >
                     <div
                       className="h-full w-full cursor-pointer"
-                      onClick={() => setEditingBoxId(box.id)}
+                      onClick={() => {
+                        if (dragGuard.shouldOpen(box.id)) setEditingBoxId(box.id);
+                      }}
                     >
                       <span className="pointer-events-none absolute -top-6 left-0 rounded bg-accent px-1.5 py-0.5 text-xs whitespace-nowrap text-accent-fg">
                         {box.name}
@@ -487,7 +500,7 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
           <DialogHeader icon={<PencilIcon />}>
             <DialogTitle>Rename field</DialogTitle>
             <DialogDescription>
-              Choose a new name for "{renamingBox?.name}".
+              Choose a new name for "{renameLabel}".
             </DialogDescription>
           </DialogHeader>
           <Input

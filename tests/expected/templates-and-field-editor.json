@@ -73,7 +73,7 @@
     "text: Text color",
     "text: Times-Roman"
   ],
-  "settingsOpenAfterDragging": 1,
+  "settingsOpenAfterDragging": 0,
   "afterStyleMoveAndRename": [
     {
       "name": "Fake Form",

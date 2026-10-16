@@ -916,3 +916,34 @@ test("templates can be saved to a file and loaded from one: the template list of
   assert.ok(buttons.includes("Restore"), buttons.join(" | "));
   await context.close();
 });
+
+// Was known issue 7 (backlog batch G): while the rename dialog faded out, its
+// first line read 'Choose a new name for "".', since the name was forgotten
+// at once. Every frame of the fade is read here.
+test("the rename dialog keeps naming the template while it fades out, after Cancel and after Save", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context, page } = await openApp([template(pdf)]);
+  for (const button of ["Cancel", "Save"]) {
+    await page.getByRole("button", { name: "Rename", exact: true }).first().click();
+    await page.getByRole("dialog").getByText("Choose a new name for").waitFor();
+    const seen = await page.evaluate(
+      (label) =>
+        new Promise((resolve) => {
+          const lines = [];
+          [...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent.trim() === label).click();
+          const read = () => {
+            const dialog = document.querySelector('[role="dialog"]');
+            if (!dialog) return resolve(lines);
+            const line = [...dialog.querySelectorAll("p")].map((p) => p.textContent).find((t) => t.startsWith("Choose a new name for"));
+            if (line) lines.push(line);
+            requestAnimationFrame(read);
+          };
+          read();
+        }),
+      button,
+    );
+    assert.ok(seen.length > 0, `the fade was seen after ${button}`);
+    assert.deepEqual([...new Set(seen)], ['Choose a new name for "TEST Form".'], `after ${button}`);
+  }
+  await context.close();
+});

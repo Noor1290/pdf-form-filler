@@ -55,11 +55,15 @@ export function TemplateList({
   readOnly = false,
 }: TemplateListProps) {
   const [renaming, setRenaming] = useState<Template | null>(null);
+  // The name the rename dialog was opened for. Kept after it closes, so the
+  // dialog still names the template while it fades out (known issue 7).
+  const [renameLabel, setRenameLabel] = useState("");
   const [renameValue, setRenameValue] = useState("");
   const [deleting, setDeleting] = useState<Template | null>(null);
 
   function startRename(template: Template) {
     setRenaming(template);
+    setRenameLabel(template.name);
     setRenameValue(template.name);
   }
 
@@ -217,7 +221,7 @@ export function TemplateList({
           <DialogHeader icon={<PencilIcon />}>
             <DialogTitle>Rename template</DialogTitle>
             <DialogDescription>
-              Choose a new name for "{renaming?.name}".
+              Choose a new name for "{renameLabel}".
             </DialogDescription>
           </DialogHeader>
           <Input

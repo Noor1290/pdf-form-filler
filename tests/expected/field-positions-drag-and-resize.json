@@ -172,10 +172,10 @@
       ]
     },
     "settingsOpenedAfter": {
-      "moving in the editor": 1,
+      "moving in the editor": 0,
       "resizing from the bottom-right handle": 0,
       "resizing from the top-left handle": 0,
-      "moving on the fill-in screen": 1,
+      "moving on the fill-in screen": 0,
       "resizing on the fill-in screen": 0
     }
   },
@@ -352,10 +352,10 @@
       ]
     },
     "settingsOpenedAfter": {
-      "moving in the editor": 1,
+      "moving in the editor": 0,
       "resizing from the bottom-right handle": 0,
       "resizing from the top-left handle": 0,
-      "moving on the fill-in screen": 1,
+      "moving on the fill-in screen": 0,
       "resizing on the fill-in screen": 0
     }
   }

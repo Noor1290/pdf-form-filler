@@ -46,6 +46,7 @@ import type { DashboardPayroll } from "@/lib/payrollHub";
 import { resizeHandleStyles } from "@/lib/rndHandleStyles";
 import { templateStore } from "@/lib/templateStore";
 import { validateFieldValue } from "@/lib/validation";
+import { createDragClickGuard, hasMoved } from "@/lib/dragClick";
 import type {
   EmployerField,
   FieldBox,
@@ -200,6 +201,8 @@ export function FieldForm({
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [editingBoxId, setEditingBoxId] = useState<string | null>(null);
+  // The click that ends moving a field does not open its settings.
+  const dragGuard = useMemo(createDragClickGuard, []);
   const [confirmingClear, setConfirmingClear] = useState(false);
 
   // Which parts of this screen the browser refused to store (its storage
@@ -858,13 +861,17 @@ export function FieldForm({
                     bounds="parent"
                     position={{ x: pixelRect.x, y: pixelRect.y }}
                     size={{ width: pixelRect.width, height: pixelRect.height }}
-                    onDragStop={(_event, data) =>
+                    onDragStop={(_event, data) => {
+                      dragGuard.dragStopped(
+                        box.id,
+                        hasMoved(pixelRect.x, pixelRect.y, data.x, data.y),
+                      );
                       updateBoxRect(box.id, {
                         ...pixelRect,
                         x: data.x,
                         y: data.y,
-                      })
-                    }
+                      });
+                    }}
                     onResizeStop={(
                       _event,
                       _direction,
@@ -884,7 +891,9 @@ export function FieldForm({
                   >
                     <div
                       className="h-full w-full cursor-pointer"
-                      onClick={() => setEditingBoxId(box.id)}
+                      onClick={() => {
+                        if (dragGuard.shouldOpen(box.id)) setEditingBoxId(box.id);
+                      }}
                     >
                       <span className="pointer-events-none absolute -top-6 left-0 rounded bg-accent px-1.5 py-0.5 text-xs whitespace-nowrap text-accent-fg">
                         {box.name}
