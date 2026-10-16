@@ -12,7 +12,14 @@ evidence uses fake data.
 Fixed after the audit; see "Fixed after the audit" at the end of this file.
 The number is kept so the items below keep theirs.
 
-## 2. Moving a field opens its settings
+## 2. (Fixed) Moving a field opens its settings
+
+**Fixed (16 October 2026, backlog batch G).** The click the browser sends when a drag ends on
+the outline is ignored when the field moved; a plain click still opens the settings
+(`src/lib/dragClick.ts`, used by the field editor and the fill-in screen). The safety net is
+re-recorded: `settingsOpenAfterDragging` and `settingsOpenedAfter` after each move are now `0`,
+in the editor and on the fill-in screen, on both pages; every position and size is unchanged.
+What follows is the record of the problem.
 
 **Where:** field editor, and the fill-in screen with positions unlocked.
 
@@ -74,7 +81,12 @@ check. They are unchanged in the code.
 Fixed after the audit; see "Fixed after the audit" at the end of this file.
 The number is kept so later items keep theirs.
 
-## 7. A rename dialog reads 'Choose a new name for "".' while it fades out (cosmetic)
+## 7. (Fixed) A rename dialog reads 'Choose a new name for "".' while it fades out (cosmetic)
+
+**Fixed (16 October 2026, backlog batch G).** Both rename dialogs keep the name they were opened
+for, apart from the state that closes them. Proven by `tests/audit.test.mjs` ("the rename dialog
+keeps naming the template while it fades out, after Cancel and after Save"), which reads every
+frame of the fade and fails on the old code. What follows is the record of the problem.
 
 **Priority: to be decided.** Found while extending the visible-text check;
 not part of that task, so not fixed.
