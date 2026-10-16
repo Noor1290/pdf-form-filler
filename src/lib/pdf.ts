@@ -151,6 +151,28 @@ function makePrintable(
   return { text, replaced };
 }
 
+// How wide a value is drawn in its box, in points: the same font, size and
+// character replacement as the download (drawValuesOnPage below). Loads the
+// fonts once; the function it gives back then measures at once, so the form
+// can say on every key which values are wider than their box (audit M16).
+// Nothing is shrunk or wrapped: the PDF still draws the value at full size.
+export async function loadValueMeasurer(): Promise<
+  (box: FieldBox, value: string) => number
+> {
+  const doc = await PDFDocument.create();
+  const fonts = new Map<string, PDFFont>();
+  for (const [family, variants] of Object.entries(STANDARD_FONTS)) {
+    for (const [variant, name] of Object.entries(variants)) {
+      fonts.set(`${family}-${variant}`, await doc.embedFont(name));
+    }
+  }
+  return (box, value) => {
+    const font = fonts.get(`${box.fontFamily}-${box.bold ? "bold" : "regular"}`);
+    if (!font || !value) return 0;
+    return font.widthOfTextAtSize(makePrintable(value, font).text, box.fontSize);
+  };
+}
+
 // Draws one entry's values onto a single (already-copied) page, matching
 // each box's position/font/alignment — shared by every page produced by
 // exportFilledPdf below. Returns the boxes whose value had characters the

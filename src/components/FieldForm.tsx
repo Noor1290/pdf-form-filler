@@ -38,6 +38,7 @@ import {
   exportFilledPdf,
   getPageSize,
   loadPdfDocument,
+  loadValueMeasurer,
   renderPdfPageToCanvas,
   type ReplacedCharacters,
 } from "@/lib/pdf";
@@ -261,6 +262,24 @@ export function FieldForm({
   // rather than the order boxes were drawn in — `boxes` itself stays in
   // creation order since that's what gets saved.
   const orderedBoxes = useMemo(() => sortBoxesByPosition(boxes), [boxes]);
+
+  // Measures a value as the download draws it, so a value wider than its box
+  // is said beside its field (audit M16). Until the fonts are loaded, and if
+  // they cannot be, nothing is said.
+  const [measureValue, setMeasureValue] = useState<
+    ((box: FieldBox, value: string) => number) | null
+  >(null);
+  useEffect(() => {
+    let live = true;
+    loadValueMeasurer()
+      .then((measure) => {
+        if (live) setMeasureValue(() => measure);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // Redraw the text overlay whenever a value or box position changes, on a
   // separate canvas layered over the (already-rendered) PDF page — cheap
@@ -553,10 +572,20 @@ export function FieldForm({
     importedValues: Record<string, string>[],
     mode: "append" | "replace",
   ) {
-    const imported: TemplateEntry[] = importedValues.map((entryValues) => ({
-      id: crypto.randomUUID(),
-      values: entryValues,
-    }));
+    // Each imported person gets the template's company details, as a person
+    // typed by hand does, under the values in the file: a value the file
+    // has wins; a column it lacks, or leaves blank, keeps the company detail.
+    const employerValues = computeEmployerAutofill(
+      boxes,
+      template.employerFields ?? [],
+    );
+    const imported: TemplateEntry[] = importedValues.map((entryValues) => {
+      const values = { ...entryValues };
+      for (const [boxId, value] of Object.entries(employerValues)) {
+        if (!values[boxId]) values[boxId] = value;
+      }
+      return { id: crypto.randomUUID(), values };
+    });
     setEntries((current) =>
       mode === "replace" ? imported : [...current, ...imported],
     );
@@ -882,6 +911,9 @@ export function FieldForm({
                 box.validationType,
                 values[box.id] ?? "",
               );
+              const tooWide =
+                measureValue !== null &&
+                measureValue(box, values[box.id] ?? "") > box.width;
               return (
                 <div key={box.id} className="flex flex-col gap-1.5">
                   <label
@@ -904,6 +936,13 @@ export function FieldForm({
                     <p className="flex items-center gap-1.5 text-xs text-warn">
                       <TriangleAlertIcon className="size-3.5 shrink-0" />
                       {warning}
+                    </p>
+                  )}
+                  {tooWide && (
+                    <p className="flex items-center gap-1.5 text-xs text-warn">
+                      <TriangleAlertIcon className="size-3.5 shrink-0" />
+                      Too long for its box: on the PDF it will run past the
+                      edge of the box.
                     </p>
                   )}
                 </div>

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PdfCanvas } from "@/components/PdfCanvas";
 import { fileToBase64, isPdfFile } from "@/lib/pdf";
-import { templateStore } from "@/lib/templateStore";
+import { templateStore, TemplateNotStoredError } from "@/lib/templateStore";
 import type { Template } from "@/types/template";
 
 const { createTemplate } = templateStore;
@@ -58,13 +58,17 @@ export function NewTemplateFlow({
       });
       onCreated(template);
     } catch (problem) {
-      // The dashboard store says why when the PDF is too large for it.
+      // The dashboard store says why when the PDF is too large for it. On
+      // its own, a refusal by the browser means its storage is full.
       const tooLarge =
         problem instanceof Error && problem.message.startsWith("This PDF is larger");
+      const megabytes = (file.size / 1_048_576).toFixed(1);
       setError(
         tooLarge
           ? problem.message
-          : "Something went wrong saving this template. Please try again.",
+          : problem instanceof TemplateNotStoredError
+            ? `This PDF (${megabytes} MB) could not be saved: there is not enough room left in this browser's storage. Delete templates you no longer need, or use a smaller PDF, then try again.`
+            : "Something went wrong saving this template. Please try again.",
       );
       setSaving(false);
     }

@@ -487,13 +487,28 @@ test("Clear all removes the listed people and leaves the person being typed in t
 
 // ========================================================== values in boxes
 
-test("evidence (BUG): a value longer than its box runs past the box; nothing shrinks, wraps or warns", TIMEOUT, async () => {
+// Was audit M16: nothing shrank, wrapped or warned. As agreed, the form now
+// warns beside each such field; the PDF still draws the value at full size
+// (shrink-to-fit would change the PDF and is left for later).
+const TOO_WIDE = "Too long for its box: on the PDF it will run past the edge of the box.";
+const tooWideFields = (page) =>
+  page.locator("label + input").evaluateAll(
+    (inputs, text) => inputs.filter((input) => input.parentElement.textContent.replace(/\s+/g, " ").includes(text)).map((input) => input.id),
+    TOO_WIDE,
+  );
+
+test("a value longer than its box is said beside its field; the PDF still draws it at full size, past the box", TIMEOUT, async () => {
   const pdf = await blankForm();
   const long = "TESTER-WITH-A-VERY-LONG-DOUBLE-BARRELLED-SURNAME-INDEED";
   const { context, page } = await openApp([template(pdf, { entries: entriesFor([{ ...PEOPLE[0], Surname: long, "Basic Salary": "1,234,567,890,123,456,789.00" }]) })]);
   await openFillScreen(page, "TEST Form");
   await page.getByRole("button", { name: "Person 1", exact: true }).click();
-  assert.equal(await page.getByRole("alert").count(), 0);
+  await page.getByText(TOO_WIDE).first().waitFor();
+  assert.deepEqual((await tooWideFields(page)).sort(), ["field-b-basic", "field-b-surname"].sort());
+  // Shortened, the warning goes.
+  await page.getByLabel("Surname", { exact: true }).fill("TESTER");
+  await page.waitForFunction((text) => [...document.querySelectorAll("p")].filter((p) => p.textContent.includes(text)).length === 1, TOO_WIDE);
+  await page.getByLabel("Surname", { exact: true }).fill(long);
   const [first] = await readVisualText((await download(page)).bytes);
   const surname = first.items.find((i) => i.text === long);
   const surnameBox = BOXES.find((b) => b.name === "Surname");
@@ -569,7 +584,8 @@ test("a single person typed into the form: an unprintable character is replaced 
   await context.close();
 });
 
-test("evidence (BUG): two fields with the same name are both allowed, but an import fills only one of them", TIMEOUT, async () => {
+// Was audit M15: an import filled only the last field drawn with that name.
+test("two fields with the same name are both allowed, and an import fills both of them", TIMEOUT, async () => {
   const pdf = await blankForm();
   const boxes = [...BOXES, box("b-surname-again", "Surname", 60, 360, 220, 20)];
   const { context, page } = await openApp([template(pdf, { boxes })]);
@@ -578,14 +594,15 @@ test("evidence (BUG): two fields with the same name are both allowed, but an imp
   const [stored] = await readStoredTemplates(page);
   assert.deepEqual(
     [stored.entries[0].values["b-surname"], stored.entries[0].values["b-surname-again"]],
-    [undefined, "TESTER"],
+    ["TESTER", "TESTER"],
   );
   const [first] = await readVisualText((await download(page)).bytes);
-  assert.equal(first.items.filter((i) => i.text === "TESTER").length, 1, "the surname is printed once, not in both boxes");
+  assert.equal(first.items.filter((i) => i.text === "TESTER").length, 2, "the surname is printed in both boxes");
   await context.close();
 });
 
-test("evidence (BUG): people who are imported do not get the template's company details; people typed by hand do", TIMEOUT, async () => {
+// Was audit M14: imported people did not get the company details.
+test("people who are imported get the template's company details, as people typed by hand do; a value in the file wins", TIMEOUT, async () => {
   const pdf = await blankForm();
   const employerFields = [
     { id: "companyName", label: "Company Name", value: "TEST Co A" },
@@ -598,14 +615,20 @@ test("evidence (BUG): people who are imported do not get the template's company 
   await page.getByLabel("Surname", { exact: true }).fill("HANDTYPED");
   await page.getByRole("button", { name: "Add & fill next person" }).click();
   // Imported from a file that has no TAN or company columns.
+  // A second person whose file row has its own TAN, and a blank company name.
   const withoutCompany = PEOPLE.slice(0, 1).map(({ "Company Name": _c, ...rest }) => rest);
-  await importFile(page, "one.json", JSON.stringify(withoutCompany));
-  assert.equal(await page.getByLabel("TAN", { exact: true }).inputValue(), "");
+  const ownTan = { ...PEOPLE[1], "Company Name": "", TAN: "TEST-TAN-OWN" };
+  await importFile(page, "two.json", JSON.stringify([...withoutCompany, ownTan]));
+  assert.equal(await page.getByLabel("TAN", { exact: true }).inputValue(), "TEST-TAN-OWN");
 
   const pages = await readVisualText((await download(page)).bytes);
-  assert.equal(pages.length, 2);
+  assert.equal(pages.length, 3);
   assert.ok(pages[0].items.some((i) => i.text === "TEST-TAN-1"), "the hand-typed person's page has the TAN");
-  assert.ok(!pages[1].items.some((i) => i.text === "TEST-TAN-1" || i.text === "TEST Co A"), "the imported person's page has neither");
+  assert.ok(pages[1].items.some((i) => i.text === "TEST-TAN-1"), "the imported person's page has the template's TAN");
+  assert.ok(pages[1].items.some((i) => i.text === "TEST Co A"), "and its company name");
+  assert.ok(pages[2].items.some((i) => i.text === "TEST-TAN-OWN"), "a TAN in the file wins");
+  assert.ok(!pages[2].items.some((i) => i.text === "TEST-TAN-1"), "and replaces the template's");
+  assert.ok(pages[2].items.some((i) => i.text === "TEST Co A"), "a blank company name in the file keeps the template's");
   await context.close();
 });
 
@@ -637,7 +660,8 @@ test("storage: how much room a template and its people take, and how much there 
   await context.close();
 });
 
-test("evidence (BUG): a PDF too large for the browser's storage cannot be saved, and the message does not say that size is the reason", TIMEOUT, async () => {
+// Was audit M17: the message did not say that size was the reason.
+test("a PDF too large for the browser's storage cannot be saved, and the message says that size is the reason", TIMEOUT, async () => {
   // A valid form followed by 4.5 MB of padding: stored as text it needs 6 MB, over the 5 MB limit.
   const big = Buffer.concat([await blankForm(), Buffer.from(`\n%${"x".repeat(4_500_000)}\n`)]);
   const { context, page } = await openApp([]);
@@ -646,9 +670,12 @@ test("evidence (BUG): a PDF too large for the browser's storage cannot be saved,
   await waitForPdfPreview(page);
   await page.getByLabel("Template name").fill("TEST Big Form");
   await page.getByRole("button", { name: "Save template" }).click();
-  await page.getByText("Something went wrong saving this template. Please try again.").waitFor();
-  const message = await page.locator(".notice-danger").textContent();
-  assert.ok(!/large|size|space|storage|MB/i.test(message), `the message explains the cause: ${message}`);
+  const notice = page.locator(".notice-danger").filter({ hasText: "could not be saved" });
+  await notice.waitFor();
+  assert.equal(
+    (await notice.textContent()).replace(/\s+/g, " ").trim(),
+    "This PDF (4.3 MB) could not be saved: there is not enough room left in this browser's storage. Delete templates you no longer need, or use a smaller PDF, then try again.",
+  );
   assert.deepEqual(await readStoredTemplates(page), []);
   await context.close();
 });

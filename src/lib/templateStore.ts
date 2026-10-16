@@ -1,5 +1,8 @@
 import { getLegacyEmployerFields } from "@/lib/employerProfile";
 import * as browserTemplates from "@/lib/template";
+
+// What the browser store throws when the browser refuses a new template.
+export { TemplateNotStoredError } from "@/lib/template";
 import type {
   EmployerField,
   FieldBox,

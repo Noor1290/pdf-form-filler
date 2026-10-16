@@ -148,6 +148,24 @@
       },
       {
         "page": 1,
+        "text": "T00000001",
+        "x": 150,
+        "y": 714.8,
+        "size": 10,
+        "font": "Courier-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 1,
         "text": "Testperson",
         "x": 150,
         "y": 678.16,
@@ -238,6 +256,24 @@
       },
       {
         "page": 2,
+        "text": "T00000001",
+        "x": 150,
+        "y": 714.8,
+        "size": 10,
+        "font": "Courier-Bold",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 2,
         "text": "Sampleton",
         "x": 150,
         "y": 678.16,
@@ -315,6 +351,24 @@
         "y": 740.12,
         "size": 9,
         "font": "Helvetica",
+        "color": {
+          "type": "RGB",
+          "red": 0,
+          "green": 0,
+          "blue": 0
+        },
+        "rotate": {
+          "type": "degrees",
+          "angle": 0
+        }
+      },
+      {
+        "page": 3,
+        "text": "T00000001",
+        "x": 150,
+        "y": 714.8,
+        "size": 10,
+        "font": "Courier-Bold",
         "color": {
           "type": "RGB",
           "red": 0,
@@ -447,6 +501,14 @@
             "font": "Helvetica"
           },
           {
+            "text": "T00000001",
+            "x": 150,
+            "y": 715,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier-Bold"
+          },
+          {
             "text": "Testperson",
             "x": 150,
             "y": 678,
@@ -527,6 +589,14 @@
             "font": "Helvetica"
           },
           {
+            "text": "T00000001",
+            "x": 150,
+            "y": 715,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier-Bold"
+          },
+          {
             "text": "Sampleton",
             "x": 150,
             "y": 678,
@@ -605,6 +675,14 @@
             "size": 9,
             "angle": 0,
             "font": "Helvetica"
+          },
+          {
+            "text": "T00000001",
+            "x": 150,
+            "y": 715,
+            "size": 10,
+            "angle": 0,
+            "font": "Courier-Bold"
           },
           {
             "text": "Placeholder",
@@ -738,7 +816,8 @@
         "Company Name": "Fakeco Test Ltd",
         "Net Pay": "6,650.00",
         "Other Names": "Delta",
-        "Surname": "Placeholder"
+        "Surname": "Placeholder",
+        "TAN": "T00000001"
       },
       "people": [
         {
@@ -746,21 +825,24 @@
           "Company Name": "Fakeco Test Ltd",
           "Net Pay": "43250.75",
           "Other Names": "Alpha",
-          "Surname": "Testperson"
+          "Surname": "Testperson",
+          "TAN": "T00000001"
         },
         {
           "Basic Salary": "61250.50",
           "Company Name": "Fakeco Test Ltd",
           "Net Pay": "52,000",
           "Other Names": "Beta Gamma",
-          "Surname": "Sampleton"
+          "Surname": "Sampleton",
+          "TAN": "T00000001"
         },
         {
           "Basic Salary": "7000",
           "Company Name": "Fakeco Test Ltd",
           "Net Pay": "6,650.00",
           "Other Names": "Delta",
-          "Surname": "Placeholder"
+          "Surname": "Placeholder",
+          "TAN": "T00000001"
         }
       ],
       "companyDetails": [

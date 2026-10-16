@@ -19,10 +19,14 @@ export function normalizeFieldKey(value: string): string {
   return value.trim().toLowerCase().replace(/[\s_-]+/g, "");
 }
 
-function buildBoxLookup(boxes: FieldBox[]): Map<string, string> {
-  const lookup = new Map<string, string>();
+// Every field with that name, in the order they were drawn: two fields may
+// share a name (the same value printed twice on the form), and an imported
+// column then fills them all, as typing into one name would.
+function buildBoxLookup(boxes: FieldBox[]): Map<string, string[]> {
+  const lookup = new Map<string, string[]>();
   for (const box of boxes) {
-    lookup.set(normalizeFieldKey(box.name), box.id);
+    const key = normalizeFieldKey(box.name);
+    lookup.set(key, [...(lookup.get(key) ?? []), box.id]);
   }
   return lookup;
 }
@@ -165,8 +169,7 @@ function matchRowsToBoxes(
   const entries = rawRows.map((row) => {
     const values: Record<string, string> = {};
     for (const [column, value] of Object.entries(row)) {
-      const boxId = lookup.get(normalizeFieldKey(column));
-      if (boxId) values[boxId] = value;
+      for (const boxId of lookup.get(normalizeFieldKey(column)) ?? []) values[boxId] = value;
     }
     return values;
   });

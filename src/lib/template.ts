@@ -38,6 +38,10 @@ export function getTemplate(id: string): Template | undefined {
   return readAll().find((template) => template.id === id);
 }
 
+// Thrown when the browser refuses to store a new template: its storage for
+// this site is full, which a large PDF alone can do (see audit M17).
+export class TemplateNotStoredError extends Error {}
+
 // Throws when the template could not be stored, so the caller never goes on
 // with a template that does not exist.
 export function createTemplate(input: {
@@ -57,7 +61,7 @@ export function createTemplate(input: {
   };
 
   if (!writeAll([...readAll(), template])) {
-    throw new Error("The template could not be stored.");
+    throw new TemplateNotStoredError("The template could not be stored.");
   }
   return template;
 }
