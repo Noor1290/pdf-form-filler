@@ -277,3 +277,14 @@ not already marked "NOT saved":
 screen". All three fail without the fix.
 
 **What changed:** src/components/FieldForm.tsx only. No wording was added.
+
+# Future work (from the v1 roadmap, archived 17 Oct 2026)
+
+The v1 build steps of `roadmap.md` (now `docs/archive/roadmap.md`) are finished. What it left for later, and where each item stands:
+
+- **Validation per field type (roadmap Step 9): not built.** The idea: mark a field as an amount, a NID or plain text (or infer it from its name), and show a warning under the input when a value does not fit, without blocking typing. A field has no type today, and values are stored and drawn exactly as typed.
+- **Fields on pages other than page 1: not built.** Other pages are copied into the output but cannot hold fields (`PAGE_NUMBER = 1` in `src/components/BoxEditor.tsx`; audit item L4).
+- **Custom font embedding (to match the MRA form's font, and to print characters the standard fonts cannot): not built.** Today a character the standard fonts cannot print is replaced with "?" in its own field and listed after the download.
+- **Audit log of generated PDFs: not built.**
+- **Batch import of many employees at once: done.** "Import" fills the People list from a CSV or JSON file (for example the payroll app's "Export for PDF fill").
+- **Shared templates via a real backend: done for one company.** Inside the Payroll Hub dashboard, templates are kept in its database for the company selected there, shared by everyone in that company. One template shared by several companies is still a later item (payroll_hub `docs/FUTURE_WORK.md`, section 3).

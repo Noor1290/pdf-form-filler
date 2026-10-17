@@ -1,3 +1,5 @@
+> Archived 17 Oct 2026: the v1 build steps are finished. Step 9 and the "out of scope" list were moved to docs/KNOWN_ISSUES.md ("Future work").
+
 # Roadmap — Statement of Emoluments PDF Filler (v1)
 
 Build in this order. Each step should leave the app in a runnable, demoable

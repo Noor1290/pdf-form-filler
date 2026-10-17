@@ -3,7 +3,17 @@
 ## What this project is
 A browser-only tool that lets a user upload a blank PDF (e.g. MRA Statement of
 Emoluments), draw named text-box fields on top of it, then fill those fields
-via a form with a live preview, and export a filled PDF. No backend in v1.
+via a form with a live preview, and export a filled PDF. It has no backend of its own
+and never talks to Supabase.
+
+- **On its own** it keeps everything in this browser's storage (`src/lib/template.ts`).
+- **Inside the Payroll Hub dashboard** it keeps its templates, and their PDFs, in the
+  dashboard's database and Storage bucket, for the company selected there, through
+  the bridge (`src/lib/dashboardStore.ts`; the contract is payroll_hub's
+  `docs/INTEGRATION.md`). The values typed into a form and the People list stay in
+  this browser.
+- Every screen reads and saves through `src/lib/templateStore.ts`, never the
+  browser's storage directly.
 
 ## Stack
 - React + TypeScript + Vite
@@ -13,9 +23,11 @@ via a form with a live preview, and export a filled PDF. No backend in v1.
 - react-rnd (or interact.js) — draggable/resizable box editor
 - Zustand or plain React state — no Redux needed
 - Zod — input validation
-- Storage: localStorage only in v1 (see docs/roadmap.md). Support
-  export/import of templates as .json files for backup and sharing between
-  users, since localStorage is per-browser/per-device.
+- Storage: see "What this project is". Backup and moving between browsers is
+  "Back up" / "Restore" on the template list (one file with every template, its
+  PDF, fields, company details, last values and People list). The old per-template
+  JSON export/import was removed. Inside the dashboard, "Copy to another company"
+  and "Import to the dashboard" share templates.
 
 ## Audience: non-technical users
 The primary users (an accountant and his daughter, not developers) will use
@@ -79,6 +91,7 @@ this daily. Every screen must be understandable without instructions:
   found it — but don't do unrelated refactors outside the current step.
 
 ## Folder structure (target)
+The original v1 sketch; the code in `src/` is the reference now.
 ```
 /src
   /components   (TemplateList, Toolbar, BoxEditor, PdfCanvas, FieldForm,
@@ -92,6 +105,7 @@ main.tsx
 ```
 
 ## Data model
+The original v1 sketch; the real types are in `src/types/template.ts`.
 ```ts
 type FieldBox = {
   id: string;
@@ -123,7 +137,8 @@ type EmployerProfile = {
 ```
 
 ## Working style
-- Build in the step order given in docs/roadmap.md. Don't jump ahead.
+- The v1 roadmap is finished (`docs/archive/roadmap.md`); what it left for later
+  is under "Future work" in `docs/KNOWN_ISSUES.md`. Build one step at a time.
 - After each step, the app should still run and be demoable.
 - Ask for clarification rather than guessing on anything related to MRA
   form fields or layout.

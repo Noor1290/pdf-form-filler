@@ -1,7 +1,8 @@
 # Statement of Emoluments PDF Filler
 
 A browser-only tool for filling repetitive PDF forms. See [CLAUDE.md](./CLAUDE.md)
-for the project spec and [roadmap.md](./roadmap.md) for the build plan.
+for the project spec. The v1 build plan is finished and archived in
+[docs/archive/roadmap.md](./docs/archive/roadmap.md); what is left for later is under "Future work" in [docs/KNOWN_ISSUES.md](./docs/KNOWN_ISSUES.md).
 
 ## Development
 
@@ -21,7 +22,7 @@ A backup file holds whatever was typed into the forms, people's details included
 
 ## Where the data is read and saved
 
-Screens never touch the browser's storage themselves. They call the operations in `src/lib/templateStore.ts`, and a store carries them out. Today the only store is the browser (`src/lib/template.ts`, `src/lib/employerProfile.ts`), so the tool behaves as it always has. Saving through the Payroll Hub dashboard (see `docs/MIGRATION_PLAN.md` in the payroll_hub repository) will be a second store with the same operations.
+Screens never touch the browser's storage themselves. They call the operations in `src/lib/templateStore.ts`, and a store carries them out. There are two stores with the same operations: opened on its own, the tool uses the browser (`src/lib/template.ts`, `src/lib/employerProfile.ts`); inside the Payroll Hub dashboard it uses the dashboard (`src/lib/dashboardStore.ts`, below; see `docs/MIGRATION_PLAN.md` in the payroll_hub repository).
 
 ## Inside the dashboard
 
