@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import { after, before, test } from "node:test";
-import { fillStorage, openFillScreen, startApp } from "./helpers/app.mjs";
+import { fillStorage, openFillScreen, startApp, waitForPdfPreview } from "./helpers/app.mjs";
 import { readPdfText } from "./helpers/read-pdf.mjs";
 import { COMPANY_DETAILS, FIELDS, buildSamplePdf, makeTemplate } from "./helpers/fake-data.mjs";
 import { openTemplatesStandin } from "./helpers/fake-hub.mjs";
@@ -286,6 +286,51 @@ test("a save the dashboard did not store is marked NOT saved, with the reason, a
   await saved(frame);
   assert.equal(await frame.getByRole("alert").count(), 0);
   assert.deepEqual((await hub.templates()).map((t) => [t.name, t.revision]), [["Not Stored Yet", 2]]);
+  await context.close();
+});
+
+// Rehearsal fix F1: the dashboard reloads the tool on a change of company, and
+// asks first while the tool says it holds a change not saved yet.
+test("the dashboard is told while a change is NOT saved, and told again once it is saved", TIMEOUT, async () => {
+  const { context, page, frame, hub } = await openInDashboard();
+  await loaded(frame);
+  const told = () => page.evaluate(() => window.received.filter((m) => m.type === "unsaved").map((m) => m.unsaved));
+  assert.deepEqual(await told(), [], "nothing unsaved at the start: nothing said");
+
+  await hub.set(() => (window.hub.state.failNext = { dataType: "pdf-template", action: "save", code: "unavailable", error: "Can't reach the database." }));
+  await rename(frame, "Dashboard Form", "Not Stored Yet");
+  await bar(frame).getByText("NOT saved").waitFor();
+  assert.deepEqual(await told(), [true]);
+
+  await button(frame.getByRole("alert"), "Try saving again").click();
+  await saved(frame);
+  assert.deepEqual(await told(), [true, false]);
+  await context.close();
+});
+
+test("the dashboard is told while the field editor shows \"Unsaved changes\", and told again once the template is saved", TIMEOUT, async () => {
+  const { context, page, frame } = await openInDashboard();
+  await loaded(frame);
+  const told = () => page.evaluate(() => window.received.filter((m) => m.type === "unsaved").map((m) => m.unsaved));
+
+  await row(frame, "Dashboard Form").click();
+  await button(frame, "Edit fields").click();
+  await waitForPdfPreview(frame);
+  const canvas = await frame.locator("canvas").first().boundingBox();
+  await page.mouse.move(canvas.x + 300, canvas.y + 600);
+  await page.mouse.down();
+  await page.mouse.move(canvas.x + 500, canvas.y + 640, { steps: 5 });
+  await page.mouse.up();
+  await frame.getByRole("dialog").getByRole("textbox").fill("Extra Field");
+  await frame.getByRole("dialog").getByRole("button", { name: "Add field" }).click();
+  await frame.getByText("Unsaved changes").waitFor();
+  assert.deepEqual(await told(), [true]);
+
+  await button(frame, "Save template").click();
+  await saved(frame);
+  assert.equal(await frame.getByText("Unsaved changes").count(), 0);
+  // Saving it in the dashboard ("Saving…") counts too; once saved, nothing is unsaved.
+  assert.equal((await told()).at(-1), false);
   await context.close();
 });
 

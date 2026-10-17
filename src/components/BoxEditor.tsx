@@ -34,6 +34,7 @@ import { resizeHandleStyles } from "@/lib/rndHandleStyles";
 import { templateStore } from "@/lib/templateStore";
 import { inferValidationType } from "@/lib/validation";
 import { createDragClickGuard, hasMoved } from "@/lib/dragClick";
+import { useReportUnsaved } from "@/lib/unsavedChanges";
 import type { FieldBox, Template } from "@/types/template";
 
 const { saveTemplateBoxes } = templateStore;
@@ -238,6 +239,10 @@ export function BoxEditor({ template, onBack }: BoxEditorProps) {
     setDirty(true);
     setRenamingBox(null);
   }
+
+  // While "Unsaved changes" shows, the dashboard asks before it reloads the
+  // tool.
+  useReportUnsaved("fields", dirty);
 
   // A save the browser refused leaves "Unsaved changes" showing.
   function handleSave() {

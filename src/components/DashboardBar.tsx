@@ -15,6 +15,7 @@ import {
   takeTheirs,
 } from "@/lib/dashboardStore";
 import type { HubMeta } from "@/lib/hubWire";
+import { useReportUnsaved } from "@/lib/unsavedChanges";
 
 type DashboardBarProps = {
   company: HubMeta;
@@ -53,6 +54,10 @@ export function DashboardBar({
     dashboardStatus.subscribe,
     dashboardStatus.get,
   );
+
+  // The dashboard asks before it reloads the tool while a change is not
+  // saved there yet.
+  useReportUnsaved("dashboard", status.state !== "saved");
 
   // Closing or reloading with something not saved yet: the browser asks first.
   useEffect(() => {

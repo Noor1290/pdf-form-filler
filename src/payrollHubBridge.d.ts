@@ -19,6 +19,7 @@ interface Window {
       payload: unknown,
     ): Promise<PayrollHubReply>;
     requestData(dataType: string, period?: string): Promise<PayrollHubReply>;
+    setUnsaved(unsaved: boolean): void;
     onStatus(listener: (connected: boolean) => void): () => void;
   };
 }

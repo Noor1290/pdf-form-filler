@@ -47,6 +47,7 @@ import { resizeHandleStyles } from "@/lib/rndHandleStyles";
 import { templateStore } from "@/lib/templateStore";
 import { validateFieldValue } from "@/lib/validation";
 import { createDragClickGuard, hasMoved } from "@/lib/dragClick";
+import { useReportUnsaved } from "@/lib/unsavedChanges";
 import type {
   EmployerField,
   FieldBox,
@@ -210,6 +211,8 @@ export function FieldForm({
   // saved": what is shown must never pass for saved when it is not.
   const [unsaved, setUnsaved] = useState({ values: false, entries: false });
   const notSaved = unsaved.values || unsaved.entries;
+  // While it says "NOT saved", the dashboard asks before it reloads the tool.
+  useReportUnsaved("form", notSaved);
   // The same, readable from the delayed saves below without waiting for the
   // next render.
   const unsavedNow = useRef(unsaved);

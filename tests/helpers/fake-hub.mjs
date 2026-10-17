@@ -223,7 +223,7 @@ export function templatesStandinHtml(appUrl, appOrigin) {
   window.addEventListener("message", async (event) => {
     if (event.source !== frame.contentWindow) return;
     const { type, id, payload } = event.data;
-    window.received.push({ type, origin: event.origin });
+    window.received.push({ type, origin: event.origin, ...(type === "unsaved" ? { unsaved: payload.unsaved } : {}) });
     if (type === "ready") post("ping", {}, "ping-" + String(Date.now()).padStart(13, "0"));
     if (type !== "request-data" && type !== "send-data") return;
     if (payload.dataType !== "pdf-template" && payload.dataType !== "pdf-file") return;
