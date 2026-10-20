@@ -19,6 +19,7 @@ import {
   peopleCount,
   readStoredTemplates,
   seedTemplates,
+  STANDIN_URL,
   startApp,
   waitForPdfPreview,
 } from "./helpers/app.mjs";
@@ -945,5 +946,107 @@ test("the rename dialog keeps naming the template while it fades out, after Canc
     assert.ok(seen.length > 0, `the fade was seen after ${button}`);
     assert.deepEqual([...new Set(seen)], ['Choose a new name for "TEST Form".'], `after ${button}`);
   }
+  await context.close();
+});
+
+// ============================================================ Date boxes
+
+// A "Date" box prints a clear date day first, DD/MM/YYYY, whether the value
+// came from the dashboard (YYYY-MM-DD) or the payroll app's PDF fill file
+// (DD/MM/YYYY). Anything else prints exactly as it is, and what was imported
+// is never changed: only what is printed.
+const DATE_BOXES = [
+  box("b-id", "ID", 60, 80, 120, 20),
+  box("b-doe", "Date of Employment", 60, 120, 160, 20, { validationType: "date" }),
+  box("b-start", "Start", 60, 160, 160, 20),
+];
+// What was filled in on each page (the blank form's own heading left out).
+const pageTexts = (pages) => pages.map((p) => p.items.map((i) => i.text).filter((t) => !t.startsWith("TEST FORM page")));
+
+test("Date box: YYYY-MM-DD and DD/MM/YYYY both print DD/MM/YYYY; anything else prints as it is; a Text box and the stored values are unchanged", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context, page } = await openApp([template(pdf, { boxes: DATE_BOXES })]);
+  await openFillScreen(page, "TEST Form");
+  const rows = [
+    { ID: "TST001", "Date of employment": "2021-03-15", Start: "2021-03-15" },
+    { ID: "TST002", "Date of Employment": "04/11/2019" },
+    { ID: "TST003", "Date of Employment": "1/8/2026" },
+    { ID: "TST004", "Date of Employment": "since 2018" },
+    { ID: "TST005", "Date of Employment": "31/02/2026" },
+  ];
+  await importFile(page, "test-people.json", JSON.stringify(rows));
+  const pages = pageTexts(await readVisualText((await download(page)).bytes));
+  assert.deepEqual(pages, [
+    ["TST001", "15/03/2021", "2021-03-15"],
+    ["TST002", "04/11/2019"],
+    ["TST003", "01/08/2026"],
+    ["TST004", "since 2018"],
+    ["TST005", "31/02/2026"],
+  ]);
+  // Only what is printed: the values imported are kept as they were.
+  const [stored] = await readStoredTemplates(page);
+  assert.deepEqual(
+    stored.entries.map((e) => e.values["b-doe"]),
+    ["2021-03-15", "04/11/2019", "1/8/2026", "since 2018", "31/02/2026"],
+  );
+  await context.close();
+});
+
+test("Date box: data delivered by the dashboard (YYYY-MM-DD) prints DD/MM/YYYY", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context } = await app.newContext();
+  const page = await context.newPage();
+  await page.goto(STANDIN_URL);
+  const frame = await (await page.locator("#app").elementHandle()).contentFrame();
+  await frame.getByText("Your templates").waitFor();
+  await seedTemplates(frame, [template(pdf, { boxes: DATE_BOXES })]);
+  await frame.getByText("TEST Form").waitFor();
+  await openFillScreen(frame, "TEST Form");
+  await page.waitForFunction(() => window.hub.received.some((m) => m.message.type === "ready"));
+  // As the dashboard sends a saved run: "Date of Employment" as it keeps it.
+  await page.evaluate(() =>
+    window.hub.send(
+      "send-data",
+      { dataType: "payroll-result", rows: [{ ID: "TST001", "Date of Employment": "2021-03-15" }], meta: { period: "2026-09" } },
+      "test-date-delivery",
+    ),
+  );
+  await frame.getByRole("dialog").waitFor();
+  await frame.getByRole("dialog").last().getByRole("button", { name: /^Import 1 person$/ }).click();
+  await frame.getByRole("dialog").first().waitFor({ state: "hidden" });
+  const started = page.waitForEvent("download");
+  await frame.getByRole("button", { name: "Download PDF" }).click();
+  const file = await started;
+  const pages = pageTexts(await readVisualText(fs.readFileSync(await file.path())));
+  assert.deepEqual(pages, [["TST001", "15/03/2021"]]);
+  await context.close();
+});
+
+test("a new box named with the word \"date\" is a Date box, as \"salary\" makes an Amount box", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context, page } = await openApp([template(pdf, { boxes: [] })]);
+  await page.getByRole("button", { name: "Edit fields" }).click();
+  await waitForPdfPreview(page);
+  const canvas = await page.locator("canvas").first().boundingBox();
+  for (const [name, at] of [
+    ["Date of Employment", 300],
+    ["Basic Salary", 360],
+    ["Update reference", 420],
+  ]) {
+    await page.mouse.move(canvas.x + 60, canvas.y + at);
+    await page.mouse.down();
+    await page.mouse.move(canvas.x + 200, canvas.y + at + 20, { steps: 6 });
+    await page.mouse.up();
+    await page.getByRole("textbox", { name: "Name this field" }).fill(name);
+    await page.getByRole("button", { name: "Add field" }).click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+  }
+  await page.getByRole("button", { name: "Save template" }).click();
+  await page.waitForFunction(() => (JSON.parse(localStorage.getItem("pdf-editor:templates") ?? "[]")[0]?.boxes ?? []).length === 3);
+  const [stored] = await readStoredTemplates(page);
+  assert.deepEqual(
+    Object.fromEntries(stored.boxes.map((b) => [b.name, b.validationType])),
+    { "Date of Employment": "date", "Basic Salary": "amount", "Update reference": "text" },
+  );
   await context.close();
 });

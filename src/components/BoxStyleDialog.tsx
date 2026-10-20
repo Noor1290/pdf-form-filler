@@ -29,6 +29,7 @@ const VALIDATION_TYPES: {
 }[] = [
   { value: "text", label: "Text" },
   { value: "amount", label: "Amount" },
+  { value: "date", label: "Date" },
 ];
 
 // Changes apply immediately to the box (same as dragging/resizing) — the
@@ -75,6 +76,10 @@ export function BoxStyleDialog({ box, onChange, onClose }: BoxStyleDialogProps) 
             <p className="text-xs text-muted">
               "Amount" gently warns if what's typed doesn't look like a
               number — it never changes what you typed.
+            </p>
+            <p className="text-xs text-muted">
+              "Date" prints a date as DD/MM/YYYY (2026-08-01 prints as
+              01/08/2026). Anything that isn't clearly a date prints as it is.
             </p>
           </div>
 

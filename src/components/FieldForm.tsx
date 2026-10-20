@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { printedValue } from "@/lib/dates";
 import {
   CircleAlertIcon,
   DownloadIcon,
@@ -319,7 +320,8 @@ export function FieldForm({
               : pixelRect.x + pixelRect.width;
         const textY = pixelRect.y + pixelRect.height / 2;
 
-        ctx.fillText(value, textX, textY);
+        // The preview prints what the PDF prints: a Date box's date as DD/MM/YYYY.
+        ctx.fillText(printedValue(box, value), textX, textY);
       }
     }, REDRAW_DEBOUNCE_MS);
 
@@ -925,7 +927,7 @@ export function FieldForm({
               );
               const tooWide =
                 measureValue !== null &&
-                measureValue(box, values[box.id] ?? "") > box.width;
+                measureValue(box, printedValue(box, values[box.id] ?? "")) > box.width;
               return (
                 <div key={box.id} className="flex flex-col gap-1.5">
                   <label

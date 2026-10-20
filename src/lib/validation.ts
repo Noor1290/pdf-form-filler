@@ -6,9 +6,14 @@ import type { FieldBox } from "@/types/template";
 // on not inventing MRA-specific field structure.
 const AMOUNT_NAME_KEYWORDS = ["amount", "salary", "total", "sum"];
 
+// A box whose name has the word "date" ("Date of Employment", "Date
+// joined") is a Date box: it prints its date as DD/MM/YYYY (see dates.ts).
+const DATE_NAME_WORD = /\bdate\b/i;
+
 export function inferValidationType(
   boxName: string,
 ): NonNullable<FieldBox["validationType"]> {
+  if (DATE_NAME_WORD.test(boxName)) return "date";
   const normalized = boxName.toLowerCase();
   return AMOUNT_NAME_KEYWORDS.some((keyword) => normalized.includes(keyword))
     ? "amount"

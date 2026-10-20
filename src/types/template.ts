@@ -13,7 +13,7 @@ export type FieldBox = {
   color: string; // hex
   // Older saved templates predate this field, so treat a missing value the
   // same as "text" everywhere it's read rather than assuming it's set.
-  validationType?: "text" | "amount";
+  validationType?: "text" | "amount" | "date";
 };
 
 export type Template = {

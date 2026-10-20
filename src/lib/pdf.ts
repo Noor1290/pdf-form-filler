@@ -9,6 +9,7 @@ import {
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 import type { FieldBox } from "@/types/template";
+import { printedValue } from "@/lib/dates";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -190,7 +191,8 @@ async function drawValuesOnPage(
     if (!value) continue;
 
     const font = await getFont(box);
-    const { text, replaced } = makePrintable(value, font);
+    // A Date box prints a clear date as DD/MM/YYYY (see dates.ts).
+    const { text, replaced } = makePrintable(printedValue(box, value), font);
     if (replaced.length > 0) {
       replacedInBoxes.push({ boxName: box.name, characters: replaced });
     }
