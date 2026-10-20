@@ -53,6 +53,7 @@
   ],
   "fieldSettingsDialog": [
     "text: \"Amount\" gently warns if what's typed doesn't look like a number — it never changes what you typed.",
+    "text: \"Date\" prints a date as DD/MM/YYYY (2026-08-01 prints as <date>). Anything that isn't clearly a date prints as it is.",
     "text: Alignment",
     "text: Amount",
     "text: Bold",
@@ -61,6 +62,7 @@
     "text: Close",
     "text: Controls how this field's text looks on the PDF, and whether we check it looks right while filling it in.",
     "text: Courier",
+    "text: Date",
     "text: Done",
     "text: Field settings — Surname",
     "text: Field type",
