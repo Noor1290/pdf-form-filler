@@ -98,14 +98,16 @@ function decode(url: string): Promise<HTMLImageElement> {
 // red, green and blue over a thin band all round it, with any transparent
 // part counted as white paper. The median, not the average, so a few
 // stray pixels (a logo touching the edge) don't tint the result.
-function edgeColorOf(image: HTMLImageElement): [number, number, number] {
-  const longest = Math.max(image.naturalWidth, image.naturalHeight);
+export function edgeColorOf(
+  image: CanvasImageSource,
+  imageWidth: number,
+  imageHeight: number,
+): [number, number, number] {
+  const longest = Math.max(imageWidth, imageHeight);
   const scale = Math.min(1, 256 / longest);
-  const width = Math.max(1, Math.round(image.naturalWidth * scale));
-  const height = Math.max(1, Math.round(image.naturalHeight * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  const width = Math.max(1, Math.round(imageWidth * scale));
+  const height = Math.max(1, Math.round(imageHeight * scale));
+  const canvas = new OffscreenCanvas(width, height);
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) return [255, 255, 255];
   context.fillStyle = "#ffffff";
@@ -156,7 +158,7 @@ export async function loadImageFile(file: File): Promise<LoadedImage> {
       pixelHeight: turned ? stored.width : stored.height,
       orientation,
       url,
-      edgeColor: edgeColorOf(decoded),
+      edgeColor: edgeColorOf(decoded, decoded.naturalWidth, decoded.naturalHeight),
     };
   } catch (problem) {
     URL.revokeObjectURL(url);

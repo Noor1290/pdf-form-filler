@@ -19,6 +19,7 @@ import {
   chooseForm,
   dragOnPage,
   openFormImages,
+  sharpeningDone,
 } from "../tests/helpers/form-images-tool.mjs";
 
 execSync("npm run build", { stdio: "ignore" });
@@ -57,10 +58,12 @@ const browser = await chromium.launch();
 const context = await browser.newContext({ acceptDownloads: true });
 const outside = [];
 let localRequests = 0;
+let modelRequests = 0;
 await context.route("**/*", (route) => {
   const url = route.request().url();
   if (url.startsWith(`${origin}/`)) {
     localRequests++;
+    if (url.includes("/models/")) modelRequests++;
     return route.continue();
   }
   outside.push(url);
@@ -96,7 +99,9 @@ try {
   await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
   await dragOnPage(page, 1, 210, [20, 30], [60, 60]);
   await chooseBoxImage(page, "fake-logo.png", await makeImage(page, { width: 400, height: 300 }));
-  await addFullPageImages(page, [file("fake-page.jpg", await makeImage(page, { width: 400, height: 300, type: "jpeg" }))]);
+  // Sharpened by the model, which the built app fetches from itself.
+  await addFullPageImages(page, [file("fake-page.jpg", await makeImage(page, { width: 48, height: 36, type: "jpeg" }))]);
+  await sharpeningDone(page);
   const formDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download PDF" }).click();
   await formDownload;
@@ -107,6 +112,7 @@ try {
 
 for (const url of outside) problems.push(`the built app requested ${url}`);
 console.log(`Requests while using the built app: ${localRequests} to itself, ${outside.length} to outside servers.`);
+console.log(`The sharpening model: requested ${modelRequests} time(s), from the app itself.`);
 
 if (problems.length > 0) {
   console.log(`\nFAIL:`);

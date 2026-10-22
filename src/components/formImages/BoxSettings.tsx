@@ -17,6 +17,8 @@ type BoxSettingsProps = {
   onSetSize: (widthMm: number, heightMm: number) => void;
   onSetLimit: (widthMm: number, heightMm: number) => void;
   onDelete: () => void;
+  // How sharp the image will print, and its sharpening switch.
+  sharpen: React.ReactNode;
   // Something typed is not a size.
   onNotASize: () => void;
 };
@@ -30,6 +32,7 @@ export function BoxSettings({
   onSetSize,
   onSetLimit,
   onDelete,
+  sharpen,
   onNotASize,
 }: BoxSettingsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,6 +99,8 @@ export function BoxSettings({
             }}
           />
         </div>
+
+        {sharpen}
 
         <CmPair
           legend="Box size (cm)"

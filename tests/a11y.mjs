@@ -31,6 +31,7 @@ import {
   chooseForm,
   dragOnPage,
   openFormImages,
+  sharpeningDone,
 } from "./helpers/form-images-tool.mjs";
 import { walkThrough } from "./helpers/walkthrough.mjs";
 
@@ -781,10 +782,17 @@ async function formImagesScreen(app) {
   await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
   await dragOnPage(page, 1, 210, [20, 30], [60, 60]);
   await chooseBoxImage(page, "fake-logo.png", await makeImage(page, { width: 780, height: 500 }));
-  await addFullPageImages(page, [file("fake-page.png", await makeImage(page, { width: 600, height: 400 }))]);
+  await addFullPageImages(page, [file("fake-page.png", await makeImage(page, { width: 60, height: 40 }))]);
+  await sharpeningDone(page);
   await inspect(page, "form & images: a box and a full-page image");
   summary.focusStops += await tabThroughEverything(page, "form & images");
-  for (const opener of ["Delete box", 'Remove "fake-page.png"', "Use another form", "Back to templates"]) {
+  for (const opener of [
+    "Compare before and after",
+    "Delete box",
+    'Remove "fake-page.png"',
+    "Use another form",
+    "Back to templates",
+  ]) {
     summary.dialogs[opener] = await dialogRoundTrip(page, opener, `form & images: ${opener}`);
   }
   await context.close();

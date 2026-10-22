@@ -17,6 +17,12 @@ import {
   FullPageImagesPanel,
   FullPagePreview,
 } from "@/components/formImages/FullPageImages";
+import {
+  CompareDialog,
+  SharpenInfo,
+  type ImageUse,
+} from "@/components/formImages/Sharpening";
+import { useSharpening } from "@/components/formImages/useSharpening";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,10 +42,12 @@ import {
   DEFAULT_MARGIN_MM,
   completedFileName,
   formatSizeCm,
+  fullPageImageMm,
   keepBoxInBounds,
   overLimit,
   pageMm,
   pixelsPerMmFor,
+  placedImageMm,
 } from "@/lib/formImages/measure";
 import { downloadPdfBytes } from "@/lib/pdf";
 import { useReportUnsaved } from "@/lib/unsavedChanges";
@@ -280,6 +288,39 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
     setRemoveOpen(false);
   }
 
+  // ------------------------------------------------------------ sharpening
+
+  // Every image in use, with the width it prints at. Full-page images are
+  // sharpened unless switched off; images in boxes only when switched on.
+  const sharpening = useSharpening([
+    ...boxes.flatMap((box) => {
+      const placed = placedImageMm(box);
+      return box.image && placed
+        ? [{ image: box.image, printedWidthMm: placed.width, onByDefault: false }]
+        : [];
+    }),
+    ...fullPageImages.map((image) => ({
+      image,
+      printedWidthMm: fullPageImageMm(image.pixelWidth, image.pixelHeight, marginMm).width,
+      onByDefault: true,
+    })),
+  ]);
+  const [comparing, setComparing] = useState<ImageUse | null>(null);
+  const comparedState = comparing ? sharpening.states[comparing.image.id] : undefined;
+
+  function sharpenInfo(image: LoadedImage) {
+    const use = sharpening.uses.get(image.id);
+    if (!use) return null;
+    return (
+      <SharpenInfo
+        use={use}
+        state={sharpening.states[image.id]}
+        onSwitch={(on) => sharpening.choose(image.id, on)}
+        onCompare={() => setComparing(use)}
+      />
+    );
+  }
+
   // -------------------------------------------------------------- download
 
   async function download() {
@@ -287,7 +328,14 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
     setError(null);
     setDownloading(true);
     try {
-      const bytes = await buildCompletedPdf({ form, boxes, fullPageImages, marginMm });
+      const sharpened = await sharpening.sharpenedForPdf();
+      const bytes = await buildCompletedPdf({
+        form,
+        boxes,
+        fullPageImages,
+        marginMm,
+        sharpened,
+      });
       const name = fileName.trim() || completedFileName(form.fileName);
       downloadPdfBytes(bytes, /\.pdf$/i.test(name) ? name : `${name}.pdf`);
     } catch {
@@ -458,6 +506,7 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
                 onChooseImage={(file) => void chooseBoxImage(selected, file)}
                 onSetSize={(width, height) => setBoxSize(selected, width, height)}
                 onSetLimit={(width, height) => setBoxLimit(selected, width, height)}
+                sharpen={selected.image ? sharpenInfo(selected.image) : null}
                 onDelete={() => {
                   setDeletingBox(selected);
                   setDeleteOpen(true);
@@ -472,6 +521,7 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
             <FullPageImagesPanel
               images={fullPageImages}
               firstPageNumber={formPageCount + 1}
+              sharpenInfo={sharpenInfo}
               marginMm={marginMm}
               onAdd={(files) => void addFullPageImages(files)}
               onMove={moveFullPageImage}
@@ -503,15 +553,28 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
                     {boxesWithoutImage.map((box) => box.label).join(", ")}.
                   </p>
                 )}
-                <Button onClick={() => void download()} disabled={downloading}>
+                <Button
+                  onClick={() => void download()}
+                  disabled={downloading || sharpening.busy}
+                >
                   <DownloadIcon />
-                  {downloading ? "Preparing PDF…" : "Download PDF"}
+                  {sharpening.busy
+                    ? "Sharpening images…"
+                    : downloading
+                      ? "Preparing PDF…"
+                      : "Download PDF"}
                 </Button>
               </div>
             </section>
           </div>
         </div>
       )}
+
+      <CompareDialog
+        use={comparedState?.status === "done" ? comparing : null}
+        result={comparedState?.status === "done" ? comparedState.result : null}
+        onClose={() => setComparing(null)}
+      />
 
       <Dialog open={leaving} onOpenChange={(open) => !open && setLeaving(false)}>
         <DialogContent>

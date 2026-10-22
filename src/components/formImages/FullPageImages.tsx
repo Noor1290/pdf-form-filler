@@ -18,6 +18,8 @@ type FullPageImagesPanelProps = {
   onRemove: (image: LoadedImage) => void;
   onMargin: (marginMm: number) => void;
   onNotAMargin: () => void;
+  // How sharp an image will print, and its sharpening switch.
+  sharpenInfo: (image: LoadedImage) => React.ReactNode;
 };
 
 // The largest margin that still leaves room for an image on A4.
@@ -32,6 +34,7 @@ export function FullPageImagesPanel({
   onRemove,
   onMargin,
   onNotAMargin,
+  sharpenInfo,
 }: FullPageImagesPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [margin, setMargin] = useState(String(marginMm));
@@ -63,8 +66,9 @@ export function FullPageImagesPanel({
             {images.map((image, index) => (
               <li
                 key={image.id}
-                className="flex items-center gap-2 rounded-lg border border-line py-1 pr-1 pl-2"
+                className="flex flex-col gap-1.5 rounded-lg border border-line py-1 pr-1 pl-2"
               >
+                <div className="flex items-center gap-2">
                 <img
                   src={image.url}
                   alt=""
@@ -104,6 +108,8 @@ export function FullPageImagesPanel({
                     <Trash2Icon className="text-danger" />
                   </Button>
                 </div>
+                </div>
+                <div className="pb-1">{sharpenInfo(image)}</div>
               </li>
             ))}
           </ol>

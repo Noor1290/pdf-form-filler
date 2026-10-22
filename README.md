@@ -36,6 +36,14 @@ Opened inside the Payroll Hub dashboard, the tool keeps its templates in the das
 - When the dashboard cannot be reached, the tool offers the last copy of each company's templates this browser loaded from it (`src/lib/dashboardCache.ts`), read-only: "Offline: read-only copy from [date and time]. Changes can't be saved." Forms can still be filled in and downloaded. If the browser has no room to keep that copy, none is kept and none is offered.
 - With a dashboard that does not keep templates yet, the tool uses this browser.
 
+## Form & images
+
+A separate tool, opened from the home screen: upload a form (a PDF, or images that each become an A4 page), draw boxes on its pages and put an image in each, add full-page images after the form's last page, and download one PDF. Nothing is stored or sent anywhere; it all happens in the browser.
+
+**Sharpening.** An image that would print under about 300 dpi (280) can be sharpened with AI upscaling in the browser: on by default for full-page images, off by default for images in boxes, switchable for each. The model is Real-ESRGAN's `realesr-general-x4v3` (four times larger, with its own light denoising at Real-ESRGAN's default strength, 0.5), converted to ONNX by `scripts/convert-sharpening-model.py` and run by ONNX Runtime Web (`onnxruntime-web`, MIT licence), on the graphics card where the browser allows it (WebGPU), else on the processor. The model (`public/models/realesr-general-x4v3.onnx`, 4.9 MB) and the runtime (27 MB) are downloaded once from this app's own site and kept in the browser's cache storage. A sharpened image is embedded as a lossless PNG at 300 dpi for its printed size (never more than four times the original). When the model can't run, or would take more than two minutes, the image is enlarged with high-quality resizing and gentle sharpening instead, and the screen says so.
+
+**Model licence.** Real-ESRGAN, Copyright (c) 2021, Xintao Wang, is distributed under the BSD 3-Clause License, which allows its use in this app on condition that the copyright notice and licence are kept with it: they are in `public/models/realesr-general-x4v3.LICENSE.txt`, published next to the model. The weights are those of the v0.2.5.0 release of https://github.com/xinntao/Real-ESRGAN.
+
 ## Checks
 
 ```bash
@@ -43,6 +51,7 @@ npm test                # the safety net
 npm run test:audit      # the audit
 npm run test:storage    # the backup file, the store interface, the bridge's "activity" message
 npm run test:dashboard  # templates kept in the dashboard: saving, copying, importing (stand-in dashboard)
+npm run test:form-images  # Form & images: sizes measured in the PDF, sharpening
 npm run check:text; npm run check:a11y; npm run check:preview; npm run check:build; npm run check:encoding
 npm run lint; npx tsc -b
 ```

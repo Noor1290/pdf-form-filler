@@ -33,11 +33,27 @@ export async function chooseBoxImage(page, name, buffer) {
   await page.getByText("Image as placed:").waitFor();
 }
 
-export async function addFullPageImages(page, files) {
+// Full-page images are sharpened unless switched off; `sharpen: false`
+// switches it off for each image added that would be sharpened.
+export async function addFullPageImages(page, files, { sharpen = true } = {}) {
   const before = await page.getByRole("button", { name: /^Remove "/ }).count();
   await page.getByTestId("full-page-images-input").setInputFiles(files);
   await page
     .getByRole("button", { name: /^Remove "/ })
     .nth(before + files.length - 1)
     .waitFor();
+  if (sharpen) return;
+  for (const { name } of files) {
+    const row = page.getByRole("listitem").filter({ hasText: name });
+    const switchOn = row.getByRole("checkbox", { name: /^Sharpen with AI/ });
+    if (await switchOn.count()) await switchOn.uncheck();
+  }
+}
+
+// Waits until the image's sharpening has finished, one way or the other.
+export async function sharpeningDone(page) {
+  await page
+    .getByText(/^(Sharpened with AI|AI sharpening .* instead)/)
+    .first()
+    .waitFor({ timeout: 180_000 });
 }

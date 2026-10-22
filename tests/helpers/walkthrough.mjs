@@ -10,6 +10,7 @@ import {
   chooseForm,
   dragOnPage,
   openFormImages,
+  sharpeningDone,
 } from "./form-images-tool.mjs";
 import {
   STANDIN_URL,
@@ -344,10 +345,12 @@ export async function walkThrough(app, visit) {
   await dragOnPage(page, 1, 210, [20, 30], [60, 60]);
   await snap(page, "form & images: a box without an image");
   await chooseBoxImage(page, "fake-logo.png", await makeImage(page, { width: 780, height: 500 }));
-  await addFullPageImages(page, [file("fake-logo.png", await makeImage(page, { width: 600, height: 400 }))]);
+  // Small enough to be sharpened at once; the walk waits for it.
+  await addFullPageImages(page, [file("fake-logo.png", await makeImage(page, { width: 60, height: 40 }))]);
+  await sharpeningDone(page);
   await page.getByLabel("Box width in cm").fill("9.5");
   await page.getByRole("button", { name: "Set size", exact: true }).click();
-  await page.getByRole("status").waitFor();
+  await page.getByText("A box can't be larger than its size limit", { exact: false }).waitFor();
   await snap(page, "form & images: a box at its size limit, a full-page image");
   await page.getByLabel("Box width in cm").fill("0.2");
   await page.getByRole("button", { name: "Set size", exact: true }).click();
@@ -358,6 +361,11 @@ export async function walkThrough(app, visit) {
   await page.getByRole("button", { name: "Set limit", exact: true }).click();
   await page.getByText("to fit its new size limit", { exact: false }).waitFor();
   await snap(page, "form & images: a box made smaller by a new limit");
+  await page.getByRole("button", { name: "Compare before and after", exact: true }).click();
+  await dialog(page).locator("img").nth(1).waitFor();
+  await snap(page, "form & images: before and after");
+  await page.keyboard.press("Escape");
+  await closed(page);
   await page.getByRole("button", { name: "Delete box", exact: true }).click();
   await snap(page, "form & images: delete a box");
   await inDialog(page, "Cancel");

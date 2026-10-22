@@ -54,6 +54,7 @@ export async function readPdfImages(bytes) {
         // it is drawn.
         const [topLeftX, topLeftY] = viewport.convertToViewportPoint(...apply(ctm, [0, 1]));
         images.push({
+          edgeColour: edgeColourOf(await new Promise((resolve) => page.objs.get(args[0], resolve))),
           x: Math.min(...xs) * MM_PER_POINT,
           y: Math.min(...ys) * MM_PER_POINT,
           width: (Math.max(...xs) - Math.min(...xs)) * MM_PER_POINT,
@@ -74,6 +75,24 @@ export async function readPdfImages(bytes) {
   }
   await doc.loadingTask.destroy();
   return pages;
+}
+
+// The middle value of red, green and blue over a band 1% wide all round
+// the image's own pixels, as the PDF holds them (pdf.js decodes them).
+function edgeColourOf(decoded) {
+  const { width, height, data, kind } = decoded ?? {};
+  const channels = kind === 3 ? 4 : kind === 2 ? 3 : 0;
+  if (!channels || !data) return null;
+  const band = Math.max(1, Math.round(Math.min(width, height) * 0.01));
+  const values = [[], [], []];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (x >= band && y >= band && x < width - band && y < height - band) continue;
+      const at = (y * width + x) * channels;
+      for (let c = 0; c < 3; c++) values[c].push(data[at + c]);
+    }
+  }
+  return values.map((list) => list.sort((a, b) => a - b)[Math.floor(list.length / 2)]);
 }
 
 // pdf.js gives a fill colour as "#rrggbb" or as three numbers.

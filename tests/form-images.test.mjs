@@ -22,6 +22,7 @@ import {
   chooseForm,
   dragOnPage,
   openFormImages,
+  sharpeningDone,
 } from "./helpers/form-images-tool.mjs";
 import { readPdfImages, readStoredImages } from "./helpers/read-pdf-images.mjs";
 import { readPdfText } from "./helpers/read-pdf.mjs";
@@ -391,7 +392,9 @@ test("full-page images come after the form's last page, in the order chosen, and
     await chooseForm(page, [file("fake-form.pdf", form)], formPages);
     const first = await makeImage(page, { width: 600, height: 400 });
     const second = await makeImage(page, { width: 300, height: 500, type: "jpeg" });
-    await addFullPageImages(page, [file("first.png", first), file("second.jpg", second)]);
+    await addFullPageImages(page, [file("first.png", first), file("second.jpg", second)], {
+      sharpen: false,
+    });
     await page.getByText(`Page ${formPages + 1}`, { exact: true }).waitFor();
     await page.getByText(`Page ${formPages + 2}`, { exact: true }).waitFor();
     await page.getByText(`Page ${formPages + 2} of ${formPages + 2} (full-page image)`).waitFor();
@@ -420,7 +423,7 @@ test("a full-page image: portrait A4, as large as fits inside the margin, centre
   await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
   const navy = await makeImage(page, { width: 600, height: 400, edge: "#1b2a4a" });
   const white = await makeImage(page, { width: 400, height: 600, edge: "#ffffff", middle: "#c0392b", type: "jpeg" });
-  await addFullPageImages(page, [file("navy.png", navy), file("white.jpg", white)]);
+  await addFullPageImages(page, [file("navy.png", navy), file("white.jpg", white)], { sharpen: false });
 
   let pages = await readPdfImages((await download(page)).bytes);
   near(pages[1].widthMm, 210, "full page width");
@@ -499,5 +502,166 @@ test("leaving asks first: Stay keeps everything, Leave goes back to the template
   const stored = await page.evaluate(() => Object.keys(localStorage));
   assert.ok(!stored.some((key) => /form-images/i.test(key)), `stored: ${stored.join(", ")}`);
   assert.deepEqual(outsideRequests, [], "nothing was sent anywhere");
+  await context.close();
+});
+
+// ------------------------------------------------------------- sharpening
+//
+// The test browser has no graphics card, so the model runs on the
+// processor (WebAssembly), as on a computer without WebGPU.
+
+// Every request for the model or the runtime, by the page.
+function countDownloads(page) {
+  const seen = { model: 0, runtime: 0 };
+  page.on("request", (request) => {
+    const url = request.url();
+    if (/\/models\/realesr-general-x4v3\.onnx$/.test(url)) seen.model++;
+    if (/\.wasm$/.test(url)) seen.runtime++;
+  });
+  return seen;
+}
+
+async function aFormWithABox(page, from, to) {
+  await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
+  await dragOnPage(page, 1, A4_MM.width, from, to);
+}
+
+function storedSizes(stored) {
+  return stored
+    .filter((image) => !image.isTransparencyMask)
+    .map((image) => `${image.filter} ${image.width}x${image.height}`)
+    .sort();
+}
+
+test("how sharp each image will print is shown; sharpening is on by default for full-page images, off for images in boxes", TIMEOUT, async () => {
+  const { page, context } = await openTool();
+  await aFormWithABox(page, [10, 10], [50, 40]);
+  // 400 px across 4.0 cm: 254 dpi.
+  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 400, height: 300 }));
+  const boxSwitch = page.getByRole("checkbox", { name: "Sharpen with AI (254 dpi at this size)" });
+  assert.equal(await boxSwitch.isChecked(), false, "off for an image in a box");
+
+  // 100 px across 19 cm: 13 dpi.
+  await addFullPageImages(page, [file("tiny.png", await makeImage(page, { width: 100, height: 80 }))]);
+  const pageSwitch = page.getByRole("checkbox", { name: "Sharpen with AI (13 dpi at this size)" });
+  assert.equal(await pageSwitch.isChecked(), true, "on for a full-page image");
+  await sharpeningDone(page);
+
+  // 1000 px across 4.0 cm: nothing to sharpen.
+  await chooseBoxImage(page, "big-logo.png", await makeImage(page, { width: 1000, height: 750 }));
+  await page.getByText("635 dpi at this size: sharp enough.").waitFor();
+  await context.close();
+});
+
+test("AI sharpening: enlarged by the model to 300 dpi at the printed size, embedded losslessly in exactly the same place; the model is downloaded once", TIMEOUT, async (t) => {
+  const { page, context, outsideRequests } = await openTool();
+  const downloads = countDownloads(page);
+  await aFormWithABox(page, [20, 30], [40, 45]);
+  // 64 px across 2.0 cm: 81 dpi. Sharpened, it needs 236 px (300 dpi),
+  // which four times 64 (256) covers.
+  await chooseBoxImage(page, "small-logo.jpg", await makeImage(page, { width: 64, height: 48, type: "jpeg" }));
+  await page.getByRole("checkbox", { name: "Sharpen with AI (81 dpi at this size)" }).check();
+  await page.getByText("Sharpened with AI: prints at 300 dpi.").waitFor({ timeout: 180_000 });
+  // 40 px across 19 cm: even four times as large, 21 dpi.
+  await addFullPageImages(page, [file("tiny.png", await makeImage(page, { width: 40, height: 30 }))]);
+  await page.getByText("Sharpened with AI: prints at 21 dpi.").waitFor({ timeout: 180_000 });
+
+  const { bytes } = await download(page);
+  assert.deepEqual(
+    storedSizes(await readStoredImages(bytes)),
+    ["/FlateDecode 160x120", "/FlateDecode 236x177"],
+    "both stored losslessly (the JPEG was not recompressed), at 300 dpi or four times their size",
+  );
+  const pages = await readPdfImages(bytes);
+  assertPlaced(pages[0].images[0], { x: 20, y: 30, width: 20, height: 15 }, "the sharpened box image");
+  assertPlaced(pages[1].images[0], { x: 10, y: 77.25, width: 190, height: 142.5 }, "the sharpened full-page image");
+  // The page is filled with the colour the sharpened image's edges have
+  // (sharpening shifts the shade a little), so no frame shows around it.
+  const fill = pages[1].fills[0];
+  const edge = pages[1].images[0].edgeColour;
+  t.diagnostic(`full page: fill ${fill}, sharpened image's edges ${edge}`);
+  assert.ok(fill.every((value, c) => Math.abs(value - edge[c]) <= 1), `fill ${fill} matches edges ${edge}`);
+
+  // Again, after a reload: from the browser's cache, not downloaded again.
+  await page.reload();
+  await openFormImages(page);
+  await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
+  await addFullPageImages(page, [file("tiny-again.png", await makeImage(page, { width: 40, height: 30 }))]);
+  await page.getByText("Sharpened with AI: prints at 21 dpi.").waitFor({ timeout: 180_000 });
+  t.diagnostic(`downloads: model ${downloads.model}, runtime ${downloads.runtime}`);
+  assert.deepEqual(downloads, { model: 1, runtime: 1 }, "the model and the runtime are downloaded once");
+  assert.deepEqual(outsideRequests, [], "only this app's own site was asked for anything");
+  await context.close();
+});
+
+test("sharpening switched off, or not switched on: the original is embedded unchanged", TIMEOUT, async () => {
+  const { page, context } = await openTool();
+  await aFormWithABox(page, [20, 30], [40, 45]);
+  const logo = await makeImage(page, { width: 64, height: 48, type: "jpeg" });
+  await chooseBoxImage(page, "small-logo.jpg", logo);
+  const photo = await makeImage(page, { width: 300, height: 200, type: "jpeg" });
+  await addFullPageImages(page, [file("photo.jpg", photo)], { sharpen: false });
+
+  const stored = await readStoredImages((await download(page)).bytes);
+  assert.equal(stored.length, 2);
+  assert.ok(stored.every((image) => image.filter === "/DCTDecode"));
+  assert.ok(stored.some((image) => image.bytes.equals(logo)), "the box's JPEG unchanged");
+  assert.ok(stored.some((image) => image.bytes.equals(photo)), "the full-page JPEG unchanged");
+  await context.close();
+});
+
+test("when the model can't be downloaded: smooth resizing and gentle sharpening instead, and it says so", TIMEOUT, async () => {
+  const { page, context } = await openTool();
+  await page.route("**/models/**", (route) => route.fulfill({ status: 404, body: "" }));
+  await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
+  await addFullPageImages(page, [file("tiny.png", await makeImage(page, { width: 50, height: 40 }))]);
+  await page
+    .getByText(
+      "AI sharpening didn't work on this computer, so it was enlarged with smooth resizing and gentle sharpening instead: prints at 27 dpi.",
+    )
+    .waitFor({ timeout: 60_000 });
+  const stored = await readStoredImages((await download(page)).bytes);
+  assert.deepEqual(storedSizes(stored), ["/FlateDecode 200x160"], "four times as large, losslessly");
+  await context.close();
+});
+
+test("when this computer would take too long: resizing instead, and it says so; the download waits until then", TIMEOUT, async () => {
+  const { page, context } = await openTool();
+  await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
+  // 1600 × 1200 across 19 cm: 214 dpi. On the processor, piece by piece,
+  // it would take several minutes.
+  await addFullPageImages(page, [file("photo.png", await makeImage(page, { width: 1600, height: 1200 }))]);
+  await page.getByText(/^Sharpening… \d+%$/).waitFor();
+  assert.equal(await page.getByRole("button", { name: "Sharpening images…" }).isDisabled(), true);
+  await page
+    .getByText(
+      "AI sharpening would take too long on this computer, so it was enlarged with smooth resizing and gentle sharpening instead: prints at 300 dpi.",
+    )
+    .waitFor({ timeout: 120_000 });
+  const stored = await readStoredImages((await download(page)).bytes);
+  // 300 dpi across 19 cm: 2244 px.
+  assert.deepEqual(storedSizes(stored), ["/FlateDecode 2244x1683"]);
+  await context.close();
+});
+
+test("before and after: both shown side by side, zoomed together", TIMEOUT, async () => {
+  const { page, context } = await openTool();
+  await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
+  await addFullPageImages(page, [file("tiny.png", await makeImage(page, { width: 60, height: 40 }))]);
+  await sharpeningDone(page);
+  await page.getByRole("button", { name: "Compare before and after" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByText("Before and after").waitFor();
+  await dialog.getByText("After", { exact: true }).waitFor();
+  const images = dialog.locator("img");
+  await images.nth(1).evaluate((image) => image.decode());
+  // The "after" side is the image as it goes into the PDF: 240 × 160.
+  assert.deepEqual(
+    await images.nth(1).evaluate((image) => [image.naturalWidth, image.naturalHeight]),
+    [240, 160],
+  );
+  await dialog.getByRole("button", { name: "4×" }).click();
+  const widths = await images.evaluateAll((all) => all.map((image) => image.style.width));
+  assert.deepEqual(widths, ["400%", "400%"]);
   await context.close();
 });

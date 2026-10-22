@@ -24,6 +24,7 @@ import {
   placedImageMm,
   type Rect,
 } from "@/lib/formImages/measure";
+import type { SharpenedImage } from "@/lib/formImages/sharpen";
 import type { ImageBox, LoadedForm, LoadedImage } from "@/types/formImages";
 
 export type CompletedPdfInput = {
@@ -31,6 +32,10 @@ export type CompletedPdfInput = {
   boxes: ImageBox[];
   fullPageImages: LoadedImage[];
   marginMm: number;
+  // Images sharpened for this PDF, by image id: a PNG at 300 dpi for the
+  // size it is printed, already turned upright. It is placed exactly where
+  // the original would be.
+  sharpened?: Map<string, SharpenedImage>;
 };
 
 // An affine transform [a b c d e f]: (x, y) → (a·x + c·y + e, b·x + d·y + f),
@@ -129,6 +134,7 @@ export async function buildCompletedPdf({
   boxes,
   fullPageImages,
   marginMm,
+  sharpened = new Map(),
 }: CompletedPdfInput): Promise<Uint8Array> {
   const output = await PDFDocument.create();
 
@@ -137,8 +143,10 @@ export async function buildCompletedPdf({
   async function embed(image: LoadedImage): Promise<PDFImage> {
     const known = embedded.get(image.id);
     if (known) return known;
-    const made =
-      image.format === "jpeg"
+    const sharp = sharpened.get(image.id);
+    const made = sharp
+      ? await output.embedPng(sharp.bytes)
+      : image.format === "jpeg"
         ? await output.embedJpg(image.bytes)
         : await output.embedPng(image.bytes);
     embedded.set(image.id, made);
@@ -172,6 +180,10 @@ export async function buildCompletedPdf({
     }
   }
 
+  // A sharpened image is already upright.
+  const orientationOf = (image: LoadedImage) =>
+    sharpened.has(image.id) ? 1 : image.orientation;
+
   // 2. The image in each box. A box without an image adds nothing.
   for (const box of boxes) {
     const placed = placedImageMm(box);
@@ -180,7 +192,7 @@ export async function buildCompletedPdf({
     drawImageInRect(
       page,
       await embed(box.image),
-      box.image.orientation,
+      orientationOf(box.image),
       mmRectToPoints(placed),
     );
   }
@@ -191,7 +203,7 @@ export async function buildCompletedPdf({
     const width = mmToPoints(A4_PORTRAIT_MM.width);
     const height = mmToPoints(A4_PORTRAIT_MM.height);
     const page = output.addPage([width, height]);
-    const [r, g, b] = image.edgeColor;
+    const [r, g, b] = sharpened.get(image.id)?.edgeColor ?? image.edgeColor;
     page.drawRectangle({
       x: 0,
       y: 0,
@@ -200,7 +212,7 @@ export async function buildCompletedPdf({
       color: rgb(r / 255, g / 255, b / 255),
     });
     const rect = fullPageImageMm(image.pixelWidth, image.pixelHeight, marginMm);
-    drawImageInRect(page, await embed(image), image.orientation, mmRectToPoints(rect));
+    drawImageInRect(page, await embed(image), orientationOf(image), mmRectToPoints(rect));
   }
 
   return output.save();
