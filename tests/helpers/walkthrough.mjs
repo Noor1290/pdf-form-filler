@@ -3,6 +3,14 @@
 // and the accessibility check (which measures contrast at each stop).
 import { createHash } from "node:crypto";
 import { openTemplatesStandin } from "./fake-hub.mjs";
+import { A4, buildFakeForm, file, makeImage } from "./fake-images.mjs";
+import {
+  addFullPageImages,
+  chooseBoxImage,
+  chooseForm,
+  dragOnPage,
+  openFormImages,
+} from "./form-images-tool.mjs";
 import {
   STANDIN_URL,
   fillStorage,
@@ -322,6 +330,41 @@ export async function walkThrough(app, visit) {
   await inDialog(page, "OK");
   await closed(page);
   await row(page, "One Field Form").waitFor();
+
+  // Form & images, with a fake form and fake images.
+  await openFormImages(page);
+  await snap(page, "form & images: no form yet");
+  await page
+    .getByTestId("form-input")
+    .setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("notes") });
+  await page.getByRole("alert").waitFor();
+  await snap(page, "form & images: a file that is not a form");
+  await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }, { size: A4 }]))], 2);
+  await snap(page, "form & images: a form, no boxes");
+  await dragOnPage(page, 1, 210, [20, 30], [60, 60]);
+  await snap(page, "form & images: a box without an image");
+  await chooseBoxImage(page, "fake-logo.png", await makeImage(page, { width: 780, height: 500 }));
+  await addFullPageImages(page, [file("fake-logo.png", await makeImage(page, { width: 600, height: 400 }))]);
+  await page.getByLabel("Box width in cm").fill("9.5");
+  await page.getByRole("button", { name: "Set size", exact: true }).click();
+  await page.getByRole("status").waitFor();
+  await snap(page, "form & images: a box at its size limit, a full-page image");
+  await page.getByRole("button", { name: "Delete box", exact: true }).click();
+  await snap(page, "form & images: delete a box");
+  await inDialog(page, "Cancel");
+  await closed(page);
+  await page.getByRole("button", { name: 'Remove "fake-logo.png"', exact: true }).click();
+  await snap(page, "form & images: remove a full-page image");
+  await inDialog(page, "Cancel");
+  await closed(page);
+  await page.getByRole("button", { name: "Use another form", exact: true }).click();
+  await snap(page, "form & images: use another form");
+  await inDialog(page, "Cancel");
+  await closed(page);
+  await page.getByRole("button", { name: "Back to templates", exact: true }).click();
+  await snap(page, "form & images: leave?");
+  await inDialog(page, "Leave");
+  await page.getByText("Your templates").waitFor();
   await context.close();
 
   // ---------------- inside the stand-in dashboard ----------------

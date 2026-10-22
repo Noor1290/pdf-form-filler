@@ -12,6 +12,14 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { preview } from "vite";
 import { buildSamplePdf, COMPANY_DETAILS, makeTemplate } from "../tests/helpers/fake-data.mjs";
+import { A4, buildFakeForm, file, makeImage } from "../tests/helpers/fake-images.mjs";
+import {
+  addFullPageImages,
+  chooseBoxImage,
+  chooseForm,
+  dragOnPage,
+  openFormImages,
+} from "../tests/helpers/form-images-tool.mjs";
 
 execSync("npm run build", { stdio: "ignore" });
 
@@ -80,6 +88,18 @@ try {
   await page.getByRole("button", { name: "Back to templates" }).click();
   await page.getByRole("button", { name: "Company details", exact: true }).click();
   await page.waitForTimeout(500);
+
+  // The "Form & images" tool: a form, a box with an image, a full-page
+  // image, and its download.
+  await page.getByRole("button", { name: "Back to templates" }).click();
+  await openFormImages(page);
+  await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
+  await dragOnPage(page, 1, 210, [20, 30], [60, 60]);
+  await chooseBoxImage(page, "fake-logo.png", await makeImage(page, { width: 400, height: 300 }));
+  await addFullPageImages(page, [file("fake-page.jpg", await makeImage(page, { width: 400, height: 300, type: "jpeg" }))]);
+  const formDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download PDF" }).click();
+  await formDownload;
 } finally {
   await browser.close();
   await new Promise((resolve) => server.httpServer.close(resolve));

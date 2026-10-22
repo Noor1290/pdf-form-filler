@@ -24,6 +24,14 @@ import {
   buildSamplePdf,
   makeTemplate,
 } from "./helpers/fake-data.mjs";
+import { A4, buildFakeForm, file, makeImage } from "./helpers/fake-images.mjs";
+import {
+  addFullPageImages,
+  chooseBoxImage,
+  chooseForm,
+  dragOnPage,
+  openFormImages,
+} from "./helpers/form-images-tool.mjs";
 import { walkThrough } from "./helpers/walkthrough.mjs";
 
 // ---------------------------------------------------------------- in-page
@@ -760,6 +768,29 @@ async function everyScreen(app) {
   return null;
 }
 
+// The "Form & images" tool with a form, a box with an image and a
+// full-page image: every control by Tab, and each dialog's round trip.
+async function formImagesScreen(app) {
+  const summary = { dialogs: {} };
+  const { context } = await app.newContext();
+  const page = await context.newPage();
+  await page.goto(app.appUrl);
+  await page.getByText("Your templates").waitFor();
+  await openFormImages(page);
+  summary.focusStops = await tabThroughEverything(page, "form & images: no form yet");
+  await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
+  await dragOnPage(page, 1, 210, [20, 30], [60, 60]);
+  await chooseBoxImage(page, "fake-logo.png", await makeImage(page, { width: 780, height: 500 }));
+  await addFullPageImages(page, [file("fake-page.png", await makeImage(page, { width: 600, height: 400 }))]);
+  await inspect(page, "form & images: a box and a full-page image");
+  summary.focusStops += await tabThroughEverything(page, "form & images");
+  for (const opener of ["Delete box", 'Remove "fake-page.png"', "Use another form", "Back to templates"]) {
+    summary.dialogs[opener] = await dialogRoundTrip(page, opener, `form & images: ${opener}`);
+  }
+  await context.close();
+  return summary;
+}
+
 const SCREENS = {
   "fill-in screen": fillInScreen,
   "home screen": homeScreen,
@@ -767,6 +798,7 @@ const SCREENS = {
   "field editor": fieldEditorScreen,
   "company details": companyDetailsScreen,
   "remaining dialogs": remainingDialogs,
+  "form & images": formImagesScreen,
   "every screen (contrast and names)": everyScreen,
 };
 

@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   CircleAlertIcon,
   DownloadIcon,
   FileTextIcon,
   HardDriveIcon,
+  ImagesIcon,
   WifiOffIcon,
 } from "lucide-react";
 import { BoxEditor } from "@/components/BoxEditor";
@@ -34,6 +42,12 @@ import { readDashboardPayroll, type DashboardPayroll } from "@/lib/payrollHub";
 import { setTemplateStore, templateStore } from "@/lib/templateStore";
 import type { Template } from "@/types/template";
 
+// The "Form & images" tool is separate from the templates, and only loaded
+// when it is opened, so the screens used every day don't carry it.
+const FormImagesTool = lazy(
+  () => import("@/components/formImages/FormImagesTool"),
+);
+
 // Every read and save goes through the template store (lib/templateStore.ts).
 const { deleteTemplate, getTemplate, listTemplates, renameTemplate } =
   templateStore;
@@ -52,7 +66,8 @@ type View =
   | { name: "new" }
   | { name: "company-details"; id: string }
   | { name: "edit-boxes"; id: string }
-  | { name: "fill"; id: string };
+  | { name: "fill"; id: string }
+  | { name: "form-images" };
 
 function App() {
   const [view, setView] = useState<View>({ name: "home" });
@@ -443,6 +458,40 @@ function App() {
             }
             readOnly={readOnly}
           />
+        )}
+
+        {usable && view.name === "home" && (
+          <section className="glass flex w-full max-w-4xl animate-rise flex-wrap items-center gap-4 p-4">
+            <div className="icon-tile">
+              <ImagesIcon className="size-5" />
+            </div>
+            <div className="flex min-w-48 flex-1 flex-col gap-0.5">
+              <h2 className="font-semibold text-fg">Form & images</h2>
+              <p className="text-sm text-muted">
+                Put images such as a logo in boxes on any form, add full-page
+                images at the end, and download one PDF.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setView({ name: "form-images" })}
+            >
+              Open Form & images
+            </Button>
+          </section>
+        )}
+
+        {view.name === "form-images" && (
+          <Suspense
+            fallback={
+              <div
+                aria-hidden="true"
+                className="skeleton h-40 w-full max-w-296 rounded-lg"
+              />
+            }
+          >
+            <FormImagesTool onBack={() => setView({ name: "home" })} />
+          </Suspense>
         )}
 
         {usable && view.name === "company-details" && activeTemplate && (

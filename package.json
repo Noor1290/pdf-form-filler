@@ -12,6 +12,7 @@
     "test:audit": "node --test tests/audit.test.mjs",
     "test:storage": "node --test tests/storage.test.mjs",
     "test:dashboard": "node --test tests/dashboard.test.mjs",
+    "test:form-images": "node --test tests/form-images.test.mjs",
     "check:text": "node tests/visible-text.mjs",
     "check:encoding": "node scripts/check-encoding.mjs",
     "check:build": "node scripts/check-build.mjs",
