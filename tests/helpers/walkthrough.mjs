@@ -349,6 +349,15 @@ export async function walkThrough(app, visit) {
   await page.getByRole("button", { name: "Set size", exact: true }).click();
   await page.getByRole("status").waitFor();
   await snap(page, "form & images: a box at its size limit, a full-page image");
+  await page.getByLabel("Box width in cm").fill("0.2");
+  await page.getByRole("button", { name: "Set size", exact: true }).click();
+  await page.getByText("at least 0.5 cm wide and high", { exact: false }).waitFor();
+  await snap(page, "form & images: a box made as small as a box can be");
+  await page.getByLabel("Limit width in cm").fill("2");
+  await page.getByLabel("Limit height in cm").fill("2");
+  await page.getByRole("button", { name: "Set limit", exact: true }).click();
+  await page.getByText("to fit its new size limit", { exact: false }).waitFor();
+  await snap(page, "form & images: a box made smaller by a new limit");
   await page.getByRole("button", { name: "Delete box", exact: true }).click();
   await snap(page, "form & images: delete a box");
   await inDialog(page, "Cancel");

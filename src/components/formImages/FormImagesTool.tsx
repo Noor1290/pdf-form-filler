@@ -204,7 +204,7 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
       setNotice(AT_LIMIT(box.limitWidthMm, box.limitHeightMm));
     } else if (fitted.widthMm !== widthMm || fitted.heightMm !== heightMm) {
       setNotice(
-        `${box.label} is ${formatSizeCm(fitted.widthMm, fitted.heightMm)}: that is as large as it can be on its page, and no smaller than 0.5 cm.`,
+        `${box.label} is now ${formatSizeCm(fitted.widthMm, fitted.heightMm)}: a box must fit on its page and be at least 0.5 cm wide and high.`,
       );
     } else {
       setNotice(null);
