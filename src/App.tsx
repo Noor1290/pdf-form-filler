@@ -263,7 +263,7 @@ function App() {
             <FileTextIcon className="size-4.5" />
           </div>
           <h1 className="text-base font-semibold tracking-tight text-fg">
-            Statement of Emoluments Tool
+            PDF Form Filler
           </h1>
           <div className="ml-auto flex items-center gap-2">
             {insideDashboard && (

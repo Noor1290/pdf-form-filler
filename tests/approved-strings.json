@@ -190,7 +190,10 @@
     "text: Remove this image?",
     "text: Choose another form",
     "text: Use another form?",
-    "text: Your boxes stay on the same pages. A box on a page the new form doesn't have is removed."
+    "text: Your boxes stay on the same pages. A box on a page the new form doesn't have is removed.",
+    "text: PDF Form Filler"
   ],
-  "removed": []
+  "removed": [
+    "text: Statement of Emoluments Tool"
+  ]
 }
