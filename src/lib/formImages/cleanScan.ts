@@ -1,201 +1,31 @@
-// Cleaning a scanned page: the paper made white, and small specks and
-// marks at the edges removed. Rule-based, and careful: text, lines,
-// stamps, signatures and coats of arms are never removed, and anything
-// it is not sure about is left as it is.
+// Cleaning a scanned page: the paper made white, the "Scanned with
+// CamScanner" footer, small specks and stray marks in the margins
+// removed. Rule-based, and careful: text, lines, stamps, signatures,
+// coats of arms and the form's own shading are never removed, and
+// anything it is not sure about is left as it is.
 //
 // Works on RGBA pixels in place (it runs in a worker, see
 // cleanScan.worker.ts). No screen code here.
+import { colourAt, lightAt, saturation } from "@/lib/formImages/scanColour";
+import { removeCamScannerFooter } from "@/lib/formImages/scanFooter";
+import { whitenPaper } from "@/lib/formImages/whitenPaper";
 
 export type CleanReport = {
-  // Small isolated specks removed near the edges.
+  // Small isolated specks removed near the edges or in the margins.
   specks: number;
   // Grey or black marks removed along the very edge (scanner shadows).
   edgeMarks: number;
+  // Short stray lines removed from the margins.
+  marginLines: number;
+  // The "Scanned with CamScanner" footer removed.
+  footer: boolean;
 };
-
-const luminance = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b;
-const saturation = (r: number, g: number, b: number) =>
-  Math.max(r, g, b) - Math.min(r, g, b);
 
 export function cleanScan(data: Uint8ClampedArray, width: number, height: number): CleanReport {
   whitenPaper(data, width, height);
-  return removeEdgeSpecksAndMarks(data, width, height);
-}
-
-// ------------------------------------------------------------ the paper
-
-// The paper's own colour is measured area by area (a grid of about 40
-// across), as the brightest tenth of each area: lighting is uneven and
-// paper yellows unevenly. Each pixel is then scaled by what makes its
-// area's paper white, so ink keeps its darkness and stamps their colour
-// relative to the paper. What ends up very close to white and grey is
-// made exactly white.
-function whitenPaper(data: Uint8ClampedArray, width: number, height: number): void {
-  const block = Math.max(16, Math.round(Math.min(width, height) / 40));
-  const across = Math.ceil(width / block);
-  const down = Math.ceil(height / block);
-  const paper = new Float32Array(across * down * 3);
-  const paperLight = new Float32Array(across * down);
-
-  for (let by = 0; by < down; by++) {
-    for (let bx = 0; bx < across; bx++) {
-      const histogram = new Uint32Array(256);
-      const x0 = bx * block;
-      const y0 = by * block;
-      const x1 = Math.min(width, x0 + block);
-      const y1 = Math.min(height, y0 + block);
-      for (let y = y0; y < y1; y++) {
-        for (let x = x0; x < x1; x++) {
-          const i = (y * width + x) * 4;
-          histogram[Math.round(luminance(data[i], data[i + 1], data[i + 2]))]++;
-        }
-      }
-      // The light level above which the brightest tenth lies.
-      const tenth = ((x1 - x0) * (y1 - y0)) / 10;
-      let level = 255;
-      for (let seen = 0; level > 0 && seen + histogram[level] < tenth; level--) {
-        seen += histogram[level];
-      }
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      let count = 0;
-      for (let y = y0; y < y1; y++) {
-        for (let x = x0; x < x1; x++) {
-          const i = (y * width + x) * 4;
-          // Rounded as in the histogram, so the brightest tenth found there
-          // is the one averaged here.
-          if (Math.round(luminance(data[i], data[i + 1], data[i + 2])) < level) continue;
-          r += data[i];
-          g += data[i + 1];
-          b += data[i + 2];
-          count++;
-        }
-      }
-      const cell = by * across + bx;
-      // Never empty (the brightest level always has its pixels), but an
-      // area without a measure must not spread "not a number" to the page.
-      if (count === 0) {
-        paperLight[cell] = 0;
-        continue;
-      }
-      paper[cell * 3] = r / count;
-      paper[cell * 3 + 1] = g / count;
-      paper[cell * 3 + 2] = b / count;
-      paperLight[cell] = luminance(r / count, g / count, b / count);
-    }
-  }
-
-  fillAreasWithoutPaper(paper, paperLight, across, down);
-  smooth(paper, across, down);
-  smooth(paper, across, down);
-
-  // The paper colour for each pixel lies between the centres of the areas
-  // around it (bilinear). Worked out once per row, then along it.
-  const row = new Float32Array(across * 3);
-  for (let y = 0; y < height; y++) {
-    const gy = Math.min(down - 1, Math.max(0, y / block - 0.5));
-    const y0 = Math.floor(gy);
-    const y1 = Math.min(down - 1, y0 + 1);
-    const fy = gy - y0;
-    for (let k = 0; k < across * 3; k++) {
-      row[k] = paper[y0 * across * 3 + k] * (1 - fy) + paper[y1 * across * 3 + k] * fy;
-    }
-    for (let x = 0; x < width; x++) {
-      const gx = Math.min(across - 1, Math.max(0, x / block - 0.5));
-      const x0 = Math.floor(gx);
-      const x1 = Math.min(across - 1, x0 + 1);
-      const fx = gx - x0;
-      const i = (y * width + x) * 4;
-      const localR = row[x0 * 3] * (1 - fx) + row[x1 * 3] * fx;
-      const localG = row[x0 * 3 + 1] * (1 - fx) + row[x1 * 3 + 1] * fx;
-      const localB = row[x0 * 3 + 2] * (1 - fx) + row[x1 * 3 + 2] * fx;
-      // Never more than doubled, so a dark page is not blown out.
-      const gain = (value: number) => Math.min(2, 255 / Math.max(1, value));
-      // Dark ink gets the same gain on red, green and blue, so black stays
-      // black and not tinted; the paper gets each colour's own.
-      const even = gain(luminance(localR, localG, localB));
-      const paperLike = luminance(data[i], data[i + 1], data[i + 2]) / 255;
-      data[i] = data[i] * (even + (gain(localR) - even) * paperLike);
-      data[i + 1] = data[i + 1] * (even + (gain(localG) - even) * paperLike);
-      data[i + 2] = data[i + 2] * (even + (gain(localB) - even) * paperLike);
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      if (luminance(r, g, b) >= 236 && saturation(r, g, b) <= 28) {
-        data[i] = 255;
-        data[i + 1] = 255;
-        data[i + 2] = 255;
-      }
-    }
-  }
-}
-
-// An area that is nearly all ink (a black box, a large stamp) has no paper
-// to measure: it takes the paper colour of the areas around it.
-function fillAreasWithoutPaper(
-  paper: Float32Array,
-  paperLight: Float32Array,
-  across: number,
-  down: number,
-): void {
-  const sorted = Array.from(paperLight).sort((a, b) => a - b);
-  const typical = sorted[Math.floor(sorted.length / 2)];
-  const known = new Uint8Array(across * down);
-  for (let cell = 0; cell < known.length; cell++) {
-    known[cell] = paperLight[cell] >= typical * 0.7 ? 1 : 0;
-  }
-  for (let pass = 0; pass < across + down; pass++) {
-    let missing = 0;
-    for (let cy = 0; cy < down; cy++) {
-      for (let cx = 0; cx < across; cx++) {
-        const cell = cy * across + cx;
-        if (known[cell]) continue;
-        const sum = [0, 0, 0];
-        let count = 0;
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          const nx = cx + dx;
-          const ny = cy + dy;
-          if (nx < 0 || ny < 0 || nx >= across || ny >= down) continue;
-          const other = ny * across + nx;
-          if (known[other] !== 1) continue;
-          for (let c = 0; c < 3; c++) sum[c] += paper[other * 3 + c];
-          count++;
-        }
-        if (count === 0) {
-          missing++;
-          continue;
-        }
-        for (let c = 0; c < 3; c++) paper[cell * 3 + c] = sum[c] / count;
-        // Filled this pass: counts as known from the next pass on.
-        known[cell] = 2;
-      }
-    }
-    for (let cell = 0; cell < known.length; cell++) if (known[cell] === 2) known[cell] = 1;
-    if (missing === 0) return;
-  }
-}
-
-function smooth(paper: Float32Array, across: number, down: number): void {
-  const before = paper.slice();
-  for (let cy = 0; cy < down; cy++) {
-    for (let cx = 0; cx < across; cx++) {
-      for (let c = 0; c < 3; c++) {
-        let sum = 0;
-        let count = 0;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const nx = cx + dx;
-            const ny = cy + dy;
-            if (nx < 0 || ny < 0 || nx >= across || ny >= down) continue;
-            sum += before[(ny * across + nx) * 3 + c];
-            count++;
-          }
-        }
-        paper[(cy * across + cx) * 3 + c] = sum / count;
-      }
-    }
-  }
+  // Before the specks, which could otherwise take bits of its letters.
+  const footer = removeCamScannerFooter(data, width, height);
+  return { ...removeSpecksAndMarks(data, width, height), footer };
 }
 
 // ----------------------------------------------------- specks and marks
@@ -205,9 +35,14 @@ function isInk(data: Uint8ClampedArray, i: number): boolean {
   const r = data[i];
   const g = data[i + 1];
   const b = data[i + 2];
-  const light = luminance(r, g, b);
+  const light = 0.299 * r + 0.587 * g + 0.114 * b;
   return light < 170 || (saturation(r, g, b) > 60 && light < 235);
 }
+
+// Any mark at all, faint ones included (the light edges of letters, faint
+// print): what counts when making sure a speck is not part of something.
+const isMarked = (data: Uint8ClampedArray, i: number) =>
+  lightAt(data, i) < 225 || colourAt(data, i) > 40;
 
 type Piece = {
   area: number;
@@ -218,26 +53,61 @@ type Piece = {
   colour: number;
 };
 
+type Page = {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+  labels: Int32Array;
+  pieces: (Piece | undefined)[];
+  pxPerMm: number;
+};
+
+// A bit of ink lying wholly within a piece's outline and soft rim (a
+// pen stroke breaks into bits) belongs to that piece.
+function belongsTo(page: Page, piece: Piece, rim: number, label: number): boolean {
+  const bit = page.pieces[label];
+  return (
+    !!bit &&
+    bit.minX >= piece.minX - rim &&
+    bit.maxX <= piece.maxX + rim &&
+    bit.minY >= piece.minY - rim &&
+    bit.maxY <= piece.maxY + rim
+  );
+}
+
 // Every separate piece of ink (touching pixels, diagonals included) is
-// looked at on its own. Removed, and only near the page's edges:
-//   - a speck: tiny (at most 1.5 mm across) with no other ink within 4 mm,
-//     in the outer 8% of the page;
-//   - a mark along the very edge: grey or black, touching the edge, and
-//     wholly in the outer 3% (a scanner's shadow or a dark border).
+// looked at on its own. Removed:
+//   - a mark along the very edge: grey or black, touching the edge and
+//     wholly in the outer 3% (a scanner's shadow or a dark border), or
+//     wholly within 1.5 mm of the edge without touching it (the paper's
+//     own edge, caught by the scan);
+//   - a speck: tiny (at most 1.5 mm across), not the darkest bit of a
+//     fainter mark (a grey letter), with no other ink within 4 mm, and
+//     either in the outer 8% of the page or with no ink between it and the
+//     nearest edge. Out in the margin like that, a ruled line running past
+//     it (a table's border) may be within the 4 mm;
+//   - a short stray line in the margin: grey or black, straight across or
+//     down, 3 to 30 mm long and at most 2 mm thick, in the outer 12% of
+//     the page, nothing between it and the nearest edge, and no other mark
+//     within 10 mm.
 // Kept: anything coloured (stamps), anything with ink near it (text, a
-// signature), anything reaching further into the page.
-function removeEdgeSpecksAndMarks(
+// signature, a full stop), anything further into the page.
+function removeSpecksAndMarks(
   data: Uint8ClampedArray,
   width: number,
   height: number,
-): CleanReport {
+): Omit<CleanReport, "footer"> {
   const { labels, pieces } = findPieces(data, width, height);
   // Scans have no reliable size in mm; the page's shorter side is taken
   // as A4's 210 mm, which is close for every common form size.
   const pxPerMm = Math.min(width, height) / 210;
-  const speckBand = Math.round(Math.min(width, height) * 0.08);
-  const markBand = Math.round(Math.min(width, height) * 0.03);
-  const report: CleanReport = { specks: 0, edgeMarks: 0 };
+  const page: Page = { data, width, height, labels, pieces, pxPerMm };
+  const shorter = Math.min(width, height);
+  const speckBand = Math.round(shorter * 0.08);
+  const markBand = Math.round(shorter * 0.03);
+  const lineBand = Math.round(shorter * 0.12);
+  const rim = Math.max(1, Math.round(pxPerMm / 2));
+  const report = { specks: 0, edgeMarks: 0, marginLines: 0 };
 
   const within = (piece: Piece, band: number) =>
     piece.maxX < band ||
@@ -245,23 +115,55 @@ function removeEdgeSpecksAndMarks(
     piece.maxY < band ||
     piece.minY >= height - band;
 
+  // The edge first: once gone, a shadow no longer counts as ink near a
+  // speck or a line.
   for (let id = 1; id < pieces.length; id++) {
     const piece = pieces[id];
     if (!piece || piece.colour / piece.area > 50) continue;
-    const across = Math.max(piece.maxX - piece.minX + 1, piece.maxY - piece.minY + 1);
-
     const touchesEdge =
       piece.minX === 0 || piece.minY === 0 || piece.maxX === width - 1 || piece.maxY === height - 1;
-    if (touchesEdge && within(piece, markBand)) {
-      erase(data, labels, width, height, id, piece, Math.max(1, Math.round(pxPerMm / 2)));
+    if ((touchesEdge && within(piece, markBand)) || within(piece, 1.5 * pxPerMm)) {
+      // A wider soft rim: a mark along the edge fades out over more.
+      erase(page, id, piece, Math.max(1, Math.round(pxPerMm)));
       report.edgeMarks++;
+    }
+  }
+
+  for (let id = 1; id < pieces.length; id++) {
+    const piece = pieces[id];
+    if (!piece || piece.colour / piece.area > 50) continue;
+    const wide = piece.maxX - piece.minX + 1;
+    const tall = piece.maxY - piece.minY + 1;
+    const across = Math.max(wide, tall);
+    const thick = Math.min(wide, tall);
+
+    if (across <= 1.5 * pxPerMm) {
+      const inBand = within(piece, speckBand);
+      const inMargin = clearToEdge(page, id, piece, rim);
+      const onItsOwn =
+        (inBand || inMargin) &&
+        aloneWithin(page, id, piece, rim, 4 * pxPerMm, inMargin) &&
+        !partOfFainterMark(page, id, piece, rim);
+      if (onItsOwn) {
+        erase(page, id, piece, rim);
+        report.specks++;
+      }
       continue;
     }
 
-    const tiny = across <= 1.5 * pxPerMm;
-    if (tiny && within(piece, speckBand) && alone(labels, width, height, id, piece, 4 * pxPerMm)) {
-      erase(data, labels, width, height, id, piece, Math.max(1, Math.round(pxPerMm / 2)));
-      report.specks++;
+    const lineShaped =
+      thick <= 2 * pxPerMm &&
+      across >= 3 * pxPerMm &&
+      across <= 30 * pxPerMm &&
+      across >= thick * 4;
+    if (
+      lineShaped &&
+      within(piece, lineBand) &&
+      clearToEdge(page, id, piece, rim) &&
+      aloneWithin(page, id, piece, rim, 10 * pxPerMm, false)
+    ) {
+      erase(page, id, piece, rim);
+      report.marginLines++;
     }
   }
   return report;
@@ -334,21 +236,22 @@ function findPieces(
   return { labels, pieces };
 }
 
-// No other ink within `distance` pixels of the piece's outline box.
-function alone(
-  labels: Int32Array,
-  width: number,
-  height: number,
-  id: number,
-  piece: Piece,
-  distance: number,
-): boolean {
-  const x0 = Math.max(0, Math.floor(piece.minX - distance));
-  const x1 = Math.min(width - 1, Math.ceil(piece.maxX + distance));
-  const y0 = Math.max(0, Math.floor(piece.minY - distance));
-  const y1 = Math.min(height - 1, Math.ceil(piece.maxY + distance));
-  for (let y = y0; y <= y1; y++) {
-    for (let x = x0; x <= x1; x++) {
+// No ink between the piece (and its soft rim) and the page edge nearest
+// to it, over the piece's own width.
+function clearToEdge(page: Page, id: number, piece: Piece, rim: number): boolean {
+  const { width, height, labels } = page;
+  const gaps = [piece.minX, width - 1 - piece.maxX, piece.minY, height - 1 - piece.maxY];
+  const nearest = gaps.indexOf(Math.min(...gaps));
+  const box =
+    nearest === 0
+      ? { x0: 0, x1: piece.minX - rim - 1, y0: piece.minY - rim, y1: piece.maxY + rim }
+      : nearest === 1
+        ? { x0: piece.maxX + rim + 1, x1: width - 1, y0: piece.minY - rim, y1: piece.maxY + rim }
+        : nearest === 2
+          ? { x0: piece.minX - rim, x1: piece.maxX + rim, y0: 0, y1: piece.minY - rim - 1 }
+          : { x0: piece.minX - rim, x1: piece.maxX + rim, y0: piece.maxY + rim + 1, y1: height - 1 };
+  for (let y = Math.max(0, box.y0); y <= Math.min(height - 1, box.y1); y++) {
+    for (let x = Math.max(0, box.x0); x <= Math.min(width - 1, box.x1); x++) {
       const label = labels[y * width + x];
       if (label !== 0 && label !== id) return false;
     }
@@ -356,46 +259,129 @@ function alone(
   return true;
 }
 
-// White where the piece was, and its soft grey rim (a little around it,
-// only where there is no other ink).
-function erase(
-  data: Uint8ClampedArray,
-  labels: Int32Array,
-  width: number,
-  height: number,
+// No other ink within `distance` of the piece's outline box. With
+// `linesMayPass`, a straight ruled line running right past it (across the
+// whole area looked at, at most 1 mm thick) does not count.
+function aloneWithin(
+  page: Page,
   id: number,
   piece: Piece,
   rim: number,
-): void {
-  for (let y = Math.max(0, piece.minY - rim); y <= Math.min(height - 1, piece.maxY + rim); y++) {
-    for (let x = Math.max(0, piece.minX - rim); x <= Math.min(width - 1, piece.maxX + rim); x++) {
-      const p = y * width + x;
-      const label = labels[p];
-      if (label !== id && label !== 0) continue;
-      if (label === 0 && !nearPiece(labels, width, height, x, y, id, rim)) continue;
-      data[p * 4] = 255;
-      data[p * 4 + 1] = 255;
-      data[p * 4 + 2] = 255;
+  distance: number,
+  linesMayPass: boolean,
+): boolean {
+  const { width, height, labels, pxPerMm } = page;
+  const x0 = Math.max(0, Math.floor(piece.minX - distance));
+  const x1 = Math.min(width - 1, Math.ceil(piece.maxX + distance));
+  const y0 = Math.max(0, Math.floor(piece.minY - distance));
+  const y1 = Math.min(height - 1, Math.ceil(piece.maxY + distance));
+  // Each other piece's part inside the area looked at.
+  const others = new Map<number, { minX: number; minY: number; maxX: number; maxY: number }>();
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const label = labels[y * width + x];
+      if (label === 0 || label === id || belongsTo(page, piece, rim, label)) continue;
+      if (!linesMayPass) return false;
+      const part = others.get(label);
+      if (!part) {
+        others.set(label, { minX: x, minY: y, maxX: x, maxY: y });
+        continue;
+      }
+      part.minX = Math.min(part.minX, x);
+      part.maxX = Math.max(part.maxX, x);
+      part.minY = Math.min(part.minY, y);
+      part.maxY = Math.max(part.maxY, y);
     }
   }
+  for (const part of others.values()) {
+    const straightDown = part.maxX - part.minX + 1 <= pxPerMm && part.minY === y0 && part.maxY === y1;
+    const straightAcross = part.maxY - part.minY + 1 <= pxPerMm && part.minX === x0 && part.maxX === x1;
+    if (!straightDown && !straightAcross) return false;
+  }
+  return true;
 }
 
-function nearPiece(
-  labels: Int32Array,
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-  id: number,
-  rim: number,
-): boolean {
-  for (let dy = -rim; dy <= rim; dy++) {
-    for (let dx = -rim; dx <= rim; dx++) {
-      const nx = x + dx;
-      const ny = y + dy;
-      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-      if (labels[ny * width + nx] === id) return true;
+// The darkest bit of something larger and fainter (a grey letter, faint
+// print): its faint surroundings reach beyond its soft rim.
+function partOfFainterMark(page: Page, id: number, piece: Piece, rim: number): boolean {
+  const { data, width, height, labels } = page;
+  const x0 = Math.max(0, piece.minX - rim - 1);
+  const x1 = Math.min(width - 1, piece.maxX + rim + 1);
+  const y0 = Math.max(0, piece.minY - rim - 1);
+  const y1 = Math.min(height - 1, piece.maxY + rim + 1);
+  const areaWidth = x1 - x0 + 1;
+  const seen = new Uint8Array(areaWidth * (y1 - y0 + 1));
+  const stack: number[] = [];
+  for (let y = piece.minY; y <= piece.maxY; y++) {
+    for (let x = piece.minX; x <= piece.maxX; x++) {
+      if (labels[y * width + x] !== id) continue;
+      const local = (y - y0) * areaWidth + (x - x0);
+      seen[local] = 1;
+      stack.push(local);
+    }
+  }
+  while (stack.length > 0) {
+    const here = stack.pop()!;
+    const hx = x0 + (here % areaWidth);
+    const hy = y0 + Math.floor(here / areaWidth);
+    if (hx === x0 || hx === x1 || hy === y0 || hy === y1) {
+      // Reached past the rim (the page's own edge does not count).
+      if ((hx === x0 && x0 > 0) || (hx === x1 && x1 < width - 1)) return true;
+      if ((hy === y0 && y0 > 0) || (hy === y1 && y1 < height - 1)) return true;
+    }
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = hx + dx;
+        const ny = hy + dy;
+        if (nx < x0 || ny < y0 || nx > x1 || ny > y1) continue;
+        const next = (ny - y0) * areaWidth + (nx - x0);
+        if (seen[next] || !isMarked(data, (ny * width + nx) * 4)) continue;
+        seen[next] = 1;
+        stack.push(next);
+      }
     }
   }
   return false;
+}
+
+// White where the piece (and the bits belonging to it) was, and its soft
+// grey rim (a little around them, only where there is no other ink). The
+// piece is then gone: it no longer counts as ink near anything, and is not
+// looked at again.
+function erase(page: Page, id: number, piece: Piece, rim: number): void {
+  const { data, labels, width, height } = page;
+  const members = new Set([id]);
+  for (let y = Math.max(0, piece.minY - rim); y <= Math.min(height - 1, piece.maxY + rim); y++) {
+    for (let x = Math.max(0, piece.minX - rim); x <= Math.min(width - 1, piece.maxX + rim); x++) {
+      const label = labels[y * width + x];
+      if (label !== 0 && !members.has(label) && belongsTo(page, piece, rim, label)) members.add(label);
+    }
+  }
+  const near = (x: number, y: number) => {
+    for (let dy = -rim; dy <= rim; dy++) {
+      for (let dx = -rim; dx <= rim; dx++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        if (members.has(labels[ny * width + nx])) return true;
+      }
+    }
+    return false;
+  };
+
+  // The bits reach up to a rim beyond the piece, and their rim one more.
+  const gone: number[] = [];
+  for (let y = Math.max(0, piece.minY - 2 * rim); y <= Math.min(height - 1, piece.maxY + 2 * rim); y++) {
+    for (let x = Math.max(0, piece.minX - 2 * rim); x <= Math.min(width - 1, piece.maxX + 2 * rim); x++) {
+      const p = y * width + x;
+      const label = labels[p];
+      if (label !== 0 ? !members.has(label) : !near(x, y)) continue;
+      data[p * 4] = 255;
+      data[p * 4 + 1] = 255;
+      data[p * 4 + 2] = 255;
+      if (label !== 0) gone.push(p);
+    }
+  }
+  for (const p of gone) labels[p] = 0;
+  for (const label of members) page.pieces[label] = undefined;
 }

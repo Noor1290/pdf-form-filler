@@ -1,6 +1,7 @@
 import { SparklesIcon } from "lucide-react";
 import type { PageCleaning } from "@/components/formImages/useScanCleaning";
 import { Button } from "@/components/ui/button";
+import type { CleanReport } from "@/lib/formImages/cleanScan";
 
 // Under a scanned page's number: how its cleaning went, the switch, and
 // the before/after view.
@@ -48,11 +49,15 @@ export function ScanInfo({
   );
 }
 
-function describe({ specks, edgeMarks }: { specks: number; edgeMarks: number }): string {
+function describe({ specks, edgeMarks, marginLines, footer }: CleanReport): string {
   const parts = ["paper made white"];
   if (specks > 0) parts.push(`${specks} ${specks === 1 ? "speck" : "specks"} removed`);
   if (edgeMarks > 0) {
     parts.push(`${edgeMarks} ${edgeMarks === 1 ? "mark" : "marks"} along the edge removed`);
   }
+  if (marginLines > 0) {
+    parts.push(`${marginLines} ${marginLines === 1 ? "line" : "lines"} in the margin removed`);
+  }
+  if (footer) parts.push(`"Scanned with CamScanner" footer removed`);
   return `Cleaned: ${parts.join(", ")}.`;
 }

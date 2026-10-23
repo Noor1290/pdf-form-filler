@@ -76,17 +76,33 @@ export function file(name, buffer) {
 // stop sits near the edge but next to text; and what cleaning should
 // remove: isolated specks near the edges and a scanner's shadow down the
 // left edge. Returns the JPEG and where each thing is, in pixels.
-export async function makeFakeScan(page) {
+//
+// With `extras`: a lightly shaded header band (the form's own, to keep), a
+// form frame with a speck just outside it in the margin, a short stray
+// line in the top-left margin and a thin line just inside the right edge
+// (to remove). With `footer`, at the bottom left instead of the shadow:
+//   "camscanner"  CamScanner's "Scanned with CamScanner" footer, drawn in
+//                 its style (a grey "CS" badge and grey words), to remove;
+//   "lookalike"   the same badge with other grey words, to keep;
+//   "black"       the CamScanner words and badge in black ink, to keep.
+export async function makeFakeScan(page, { extras = false, footer = null } = {}) {
   const where = {
     paper: [[600, 250], [300, 1000], [1000, 1400], [620, 1650]],
     // On each stamp's ring.
     redStamp: [[1000, 1290], [930, 1220], [860, 1290]],
     paleStamp: [[396, 1340], [340, 1284], [284, 1340]],
     specks: [[700, 30], [1200, 900], [500, 1720]],
-    shadow: [[6, 300], [6, 900], [6, 1500]],
+    shadow: footer ? [] : [[6, 300], [6, 900], [6, 1500]],
     footerStop: [[1124, 1712]],
+    // Inside the shaded band, away from its words.
+    shading: extras ? [[700, 1130], [900, 1150], [1050, 1160]] : [],
+    marginSpeck: extras ? [[1078, 520]] : [],
+    marginLine: extras ? [[70, 73], [100, 73], [130, 73]] : [],
+    edgeLine: extras ? [[1235, 1005], [1235, 1015], [1235, 1025]] : [],
+    // Around the footer: left, top, right, bottom.
+    footerBox: footer ? [0, 1700, 330, 1754] : null,
   };
-  const base64 = await page.evaluate(async (where) => {
+  const base64 = await page.evaluate(async ({ where, extras, footer }) => {
     const canvas = new OffscreenCanvas(1240, 1754);
     const c = canvas.getContext("2d");
     const paper = c.createLinearGradient(0, 0, 1240, 1754);
@@ -154,14 +170,58 @@ export async function makeFakeScan(page) {
       c.arc(x, y, 2.5, 0, Math.PI * 2);
       c.fill();
     }
-    c.fillStyle = "rgb(70, 70, 70)";
-    c.fillRect(0, 0, 14, 1754);
+    if (!footer) {
+      c.fillStyle = "rgb(70, 70, 70)";
+      c.fillRect(0, 0, 14, 1754);
+    }
+
+    if (extras) {
+      // The form's own shading: a light green-grey band, 10 mm tall, with
+      // a section header in it.
+      c.fillStyle = "rgba(60, 90, 40, 0.08)";
+      c.fillRect(150, 1110, 940, 60);
+      c.fillStyle = "rgb(25, 25, 30)";
+      c.font = "bold 26px sans-serif";
+      c.fillText("4. IDENTIFICATION OF THE MARK", 165, 1150);
+      // A frame line down the right of the form, and a speck in the
+      // margin just outside it (2.3 mm away).
+      c.fillRect(1060, 260, 3, 390);
+      c.fillStyle = "rgb(30, 30, 30)";
+      c.beginPath();
+      c.arc(...where.marginSpeck[0], 2.5, 0, Math.PI * 2);
+      c.fill();
+      // A stray pen line in the top-left margin, 14 mm long; a thin line
+      // 1 mm inside the right edge (the paper's edge caught by the scan).
+      c.fillRect(58, 70, 82, 6);
+      c.fillStyle = "rgb(90, 90, 90)";
+      c.fillRect(1234, 1000, 3, 30);
+    }
+
+    if (footer) {
+      // As CamScanner prints it: a badge 3% of the page's width at the
+      // very bottom left, the words beside it, centred on it.
+      const grey = footer === "black" ? "rgb(25, 25, 30)" : "rgb(155, 155, 155)";
+      const size = 37;
+      const [x, y] = [6, 1754 - 6 - size];
+      c.strokeStyle = grey;
+      c.fillStyle = grey;
+      c.lineWidth = 2.5;
+      c.beginPath();
+      c.roundRect(x, y, size, size, 6);
+      c.stroke();
+      c.fillRect(x, y + size - 7, size, 7);
+      c.font = "bold 15px sans-serif";
+      c.fillText("CS", x + 8, y + 22);
+      c.font = "22px sans-serif";
+      const words = footer === "lookalike" ? "Scanned with HP Smart" : "Scanned with CamScanner";
+      c.fillText(words, x + size + 7, y + size / 2 + 8);
+    }
 
     const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.92 });
     let binary = "";
     for (const byte of new Uint8Array(await blob.arrayBuffer())) binary += String.fromCharCode(byte);
     return btoa(binary);
-  }, where);
+  }, { where, extras, footer });
   return { jpeg: Buffer.from(base64, "base64"), where };
 }
 

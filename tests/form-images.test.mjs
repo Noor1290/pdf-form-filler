@@ -800,6 +800,110 @@ test("a scan switched off goes into the PDF unchanged; the before and after can 
   await context.close();
 });
 
+// The cleaned picture of every page, in order.
+async function scanPictures(page) {
+  const pages = await readPdfImages((await download(page)).bytes, { pixels: true });
+  return pages.map((one) => one.images[0].pixels);
+}
+
+async function cleaningStatuses(page) {
+  return page.getByText(/^Cleaned:/).allInnerTexts();
+}
+
+// Pixels darker than `level` inside [left, top, right, bottom].
+function darkIn(picture, [left, top, right, bottom], level) {
+  let count = 0;
+  for (let y = top; y < bottom; y++) {
+    for (let x = left; x < right; x++) if (lightness(picture.at(x, y)) < level) count++;
+  }
+  return count;
+}
+
+test("the CamScanner footer is removed and listed, with the stray marks in the margin; a page without the footer says nothing of it; the form's shading, frame, text and ink are kept", TIMEOUT, async (t) => {
+  const { page, context } = await openTool();
+  const withFooter = await makeFakeScan(page, { extras: true, footer: "camscanner" });
+  const without = await makeFakeScan(page, { extras: true });
+  await chooseForm(page, [file("with-footer.jpg", withFooter.jpeg), file("without.jpg", without.jpeg)], 2);
+  await cleaningDone(page);
+  const statuses = await cleaningStatuses(page);
+  t.diagnostic(statuses.join("\n"));
+  assert.deepEqual(statuses, [
+    'Cleaned: paper made white, 4 specks removed, 1 mark along the edge removed, 1 line in the margin removed, "Scanned with CamScanner" footer removed.',
+    "Cleaned: paper made white, 4 specks removed, 2 marks along the edge removed, 1 line in the margin removed.",
+  ]);
+
+  const after = await scanPictures(page);
+  await switchCleaningOff(page);
+  const before = await scanPictures(page);
+
+  // Before cleaning, on the yellowed paper, the footer's grey is darker
+  // than 175; once the paper is white, darker than 215.
+  const footerBox = withFooter.where.footerBox;
+  assert.ok(darkIn(before[0], footerBox, 175) > 300, "the footer was there before");
+  assert.equal(darkIn(after[0], footerBox, 250), 0, "the footer is gone, nothing of it left");
+
+  for (const [index, { where }] of [withFooter, without].entries()) {
+    const [b, a] = [before[index], after[index]];
+    const which = `page ${index + 1}`;
+    for (const point of [...where.marginSpeck, ...where.marginLine, ...where.edgeLine]) {
+      assert.ok(lightness(b.at(...point)) < 150, `${which}: there was a mark at ${point} before`);
+      assert.ok(a.at(...point).every((value) => value >= 250), `${which}: removed at ${point}: ${a.at(...point)}`);
+    }
+    // The shading stays light and even: not made white, not blotchy.
+    for (const point of where.shading) {
+      const light = lightness(a.at(...point));
+      assert.ok(light > 200 && light < 247, `${which}: the shading is kept at ${point}: ${a.at(...point)}`);
+    }
+    const band = [660, 1115, 1055, 1165];
+    const area = (band[2] - band[0]) * (band[3] - band[1]);
+    const whitened = area - darkIn(a, band, 252);
+    assert.ok(whitened / area < 0.02, `${which}: ${whitened} of ${area} pixels of the shading made white`);
+    assert.ok(lightness(a.at(1061, 400)) < 130, `${which}: the frame line beside the margin speck is kept`);
+
+    // Every pixel of ink, other than what is removed, is still dark.
+    const removed = [...where.specks, ...where.marginSpeck, ...where.edgeLine];
+    let ink = 0;
+    let stillInk = 0;
+    for (let y = 0; y < b.height; y++) {
+      for (let x = 20; x < b.width; x++) {
+        if (closeTo([x, y], removed, 8) || (y < 90 && x < 150)) continue;
+        if (lightness(b.at(x, y)) >= 100) continue;
+        ink++;
+        if (lightness(a.at(x, y)) < 130) stillInk++;
+      }
+    }
+    t.diagnostic(`${which}: ink pixels kept: ${stillInk} of ${ink}`);
+    assert.ok(stillInk / ink >= 0.995, `${which}: ink kept: ${stillInk} of ${ink}`);
+  }
+  await context.close();
+});
+
+test("look-alikes of the footer stay: the same badge with other grey words, and the CamScanner words in black ink", TIMEOUT, async (t) => {
+  const { page, context } = await openTool();
+  const lookalike = await makeFakeScan(page, { footer: "lookalike" });
+  const black = await makeFakeScan(page, { footer: "black" });
+  await chooseForm(page, [file("lookalike.jpg", lookalike.jpeg), file("black.jpg", black.jpeg)], 2);
+  await cleaningDone(page);
+  const statuses = await cleaningStatuses(page);
+  t.diagnostic(statuses.join("\n"));
+  assert.deepEqual(statuses, [
+    "Cleaned: paper made white, 3 specks removed.",
+    "Cleaned: paper made white, 3 specks removed.",
+  ]);
+
+  const after = await scanPictures(page);
+  await switchCleaningOff(page);
+  const before = await scanPictures(page);
+  for (const [index, { where }] of [lookalike, black].entries()) {
+    // As in the test above: 175 on the yellowed paper, 215 once white.
+    const was = darkIn(before[index], where.footerBox, 175);
+    const is = darkIn(after[index], where.footerBox, 215);
+    t.diagnostic(`page ${index + 1}: ${is} footer pixels after, ${was} before`);
+    assert.ok(was > 300 && is >= was * 0.8, `page ${index + 1}: the footer is kept: ${is} of ${was}`);
+  }
+  await context.close();
+});
+
 // ------------------------------------------------------------ saved layouts
 
 const LAYOUTS_KEY = "pdf-editor:form-image-layouts";
