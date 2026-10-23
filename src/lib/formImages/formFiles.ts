@@ -3,7 +3,8 @@
 import { isPdfFile, loadPdfDocument, type PdfDocument } from "@/lib/pdf";
 import { forgetImage, loadImageFile } from "@/lib/formImages/imageFiles";
 import { a4PageForImage } from "@/lib/formImages/measure";
-import type { LoadedForm } from "@/types/formImages";
+import { scanScaleOf } from "@/lib/formImages/scanPages";
+import type { FormPage, LoadedForm } from "@/types/formImages";
 
 // Worded for the person who chose the files; shown as it is.
 export class FormFileError extends Error {}
@@ -33,12 +34,20 @@ async function openPdfForm(file: File): Promise<OpenedForm> {
   } catch {
     throw new FormFileError("This file doesn't look like a PDF.");
   }
-  const pages = [];
+  const pages: FormPage[] = [];
   for (let number = 1; number <= pdf.numPages; number++) {
+    const pdfPage = await pdf.getPage(number);
     // The size as shown, which for a page saved turned (/Rotate) is its
     // turned size: boxes are drawn on what the person sees.
-    const viewport = (await pdf.getPage(number)).getViewport({ scale: 1 });
-    pages.push({ number, widthPt: viewport.width, heightPt: viewport.height });
+    const viewport = pdfPage.getViewport({ scale: 1 });
+    const scanScale = await scanScaleOf(pdfPage);
+    pages.push({
+      number,
+      widthPt: viewport.width,
+      heightPt: viewport.height,
+      scan: scanScale !== null,
+      ...(scanScale !== null && { scanScale }),
+    });
   }
   return {
     form: { kind: "pdf", fileName: file.name, pdfBytes: bytes, pages },
@@ -63,6 +72,7 @@ async function openImageForm(files: File[]): Promise<OpenedForm> {
       number: index + 1,
       ...a4PageForImage(image.pixelWidth, image.pixelHeight),
       image,
+      scan: true,
     });
   }
   return {

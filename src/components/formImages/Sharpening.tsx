@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { SparklesIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  BeforeAfterDialog,
+  type BeforeAndAfter,
+} from "@/components/formImages/BeforeAfterDialog";
+import { Button } from "@/components/ui/button";
 import { dpiAt, MAX_ENLARGEMENT, needsSharpening, TARGET_DPI } from "@/lib/formImages/resolution";
 import { sharpenedPng, type Enlarged } from "@/lib/formImages/sharpen";
 import type { LoadedImage } from "@/types/formImages";
@@ -91,14 +88,7 @@ function describe(use: ImageUse, state: SharpenState | undefined): string {
   return `${why}, so it was enlarged with smooth resizing and gentle sharpening instead: prints at ${prints} dpi.`;
 }
 
-const ZOOMS = [
-  { label: "Whole image", factor: 1 },
-  { label: "2×", factor: 2 },
-  { label: "4×", factor: 4 },
-];
-
-// The image before and after sharpening, side by side at the same size,
-// zoomed and scrolled together.
+// The image before and after sharpening (as it goes into the PDF).
 export function CompareDialog({
   use,
   result,
@@ -109,9 +99,7 @@ export function CompareDialog({
   onClose: () => void;
 }) {
   // What the dialog was opened for, kept while it fades out.
-  const [shown, setShown] = useState<{ use: ImageUse; afterUrl: string } | null>(null);
-  const [zoom, setZoom] = useState(1);
-  const panes = useRef<(HTMLDivElement | null)[]>([]);
+  const [shown, setShown] = useState<BeforeAndAfter | null>(null);
   const afterUrl = useRef<string | null>(null);
 
   useEffect(() => {
@@ -124,8 +112,7 @@ export function CompareDialog({
       // (not on closing: it is still shown while the dialog fades out).
       if (afterUrl.current) URL.revokeObjectURL(afterUrl.current);
       afterUrl.current = url;
-      setZoom(1);
-      setShown({ use, afterUrl: url });
+      setShown({ name: use.image.name, beforeUrl: use.image.url, afterUrl: url });
     });
     return () => {
       cancelled = true;
@@ -138,68 +125,5 @@ export function CompareDialog({
     [],
   );
 
-  // Scrolling one side scrolls the other the same way.
-  function follow(from: number) {
-    const source = panes.current[from];
-    const other = panes.current[1 - from];
-    if (!source || !other) return;
-    other.scrollLeft = source.scrollLeft;
-    other.scrollTop = source.scrollTop;
-  }
-
-  const open = use !== null;
-  return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-5xl">
-        <DialogHeader icon={<SparklesIcon />}>
-          <DialogTitle>Before and after</DialogTitle>
-          <DialogDescription>
-            {shown ? `"${shown.use.image.name}"` : ""} Zoom in to see the
-            difference; both sides move together.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Zoom">
-          {ZOOMS.map(({ label, factor }) => (
-            <Button
-              key={factor}
-              size="sm"
-              variant={zoom === factor ? "default" : "outline"}
-              aria-pressed={zoom === factor}
-              onClick={() => setZoom(factor)}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
-        {shown ? (
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { title: "Before", url: shown.use.image.url },
-              { title: "After", url: shown.afterUrl },
-            ].map(({ title, url }, index) => (
-              <figure key={title} className="flex min-w-0 flex-col gap-1">
-                <figcaption className="text-sm font-medium text-fg">{title}</figcaption>
-                <div
-                  ref={(element) => {
-                    panes.current[index] = element;
-                  }}
-                  onScroll={() => follow(index)}
-                  className="on-paper h-[55vh] overflow-auto rounded-lg ring-1 ring-line"
-                >
-                  <img
-                    src={url}
-                    alt=""
-                    className="max-w-none"
-                    style={{ width: `${zoom * 100}%` }}
-                  />
-                </div>
-              </figure>
-            ))}
-          </div>
-        ) : (
-          <div aria-hidden="true" className="skeleton h-[55vh] rounded-lg" />
-        )}
-      </DialogContent>
-    </Dialog>
-  );
+  return <BeforeAfterDialog open={use !== null} shown={shown} onClose={onClose} />;
 }

@@ -12,11 +12,12 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { preview } from "vite";
 import { buildSamplePdf, COMPANY_DETAILS, makeTemplate } from "../tests/helpers/fake-data.mjs";
-import { A4, buildFakeForm, file, makeImage } from "../tests/helpers/fake-images.mjs";
+import { A4, buildFakeForm, file, makeFakeScan, makeImage } from "../tests/helpers/fake-images.mjs";
 import {
   addFullPageImages,
   chooseBoxImage,
   chooseForm,
+  cleaningDone,
   dragOnPage,
   openFormImages,
   sharpeningDone,
@@ -105,6 +106,18 @@ try {
   const formDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download PDF" }).click();
   await formDownload;
+
+  // A scanned form, cleaned in the built app's worker.
+  const { jpeg: scan } = await makeFakeScan(page);
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Use another form" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Choose another form" }).click();
+  await (await chooser).setFiles(file("fake-scan.jpg", scan));
+  await cleaningDone(page);
+  await page.getByText(/^Cleaned:/).waitFor();
+  const scanDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download PDF" }).click();
+  await scanDownload;
 } finally {
   await browser.close();
   await new Promise((resolve) => server.httpServer.close(resolve));

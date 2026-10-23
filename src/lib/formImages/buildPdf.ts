@@ -36,6 +36,9 @@ export type CompletedPdfInput = {
   // size it is printed, already turned upright. It is placed exactly where
   // the original would be.
   sharpened?: Map<string, SharpenedImage>;
+  // Scanned pages cleaned for this PDF, by page number: a PNG of the whole
+  // page as it is seen, which takes the place of the scan.
+  cleanedPages?: Map<number, Uint8Array>;
 };
 
 // An affine transform [a b c d e f]: (x, y) → (a·x + c·y + e, b·x + d·y + f),
@@ -135,6 +138,7 @@ export async function buildCompletedPdf({
   fullPageImages,
   marginMm,
   sharpened = new Map(),
+  cleanedPages = new Map(),
 }: CompletedPdfInput): Promise<Uint8Array> {
   const output = await PDFDocument.create();
 
@@ -160,8 +164,20 @@ export async function buildCompletedPdf({
     const source = await PDFDocument.load(form.pdfBytes, {
       ignoreEncryption: true,
     });
-    const copied = await output.copyPages(source, source.getPageIndices());
-    for (const page of copied) output.addPage(page);
+    // Pages copied as they are, except cleaned scans: a new page of the
+    // same size (as seen) with the cleaned picture filling it.
+    const kept = source.getPageIndices().filter((index) => !cleanedPages.has(index + 1));
+    const copied = await output.copyPages(source, kept);
+    for (const formPage of form.pages) {
+      const cleaned = cleanedPages.get(formPage.number);
+      if (!cleaned) {
+        output.addPage(copied.shift());
+        continue;
+      }
+      const page = output.addPage([formPage.widthPt, formPage.heightPt]);
+      const { width, height } = page.getSize();
+      drawImageInRect(page, await output.embedPng(cleaned), 1, { x: 0, y: 0, width, height });
+    }
   } else {
     for (const formPage of form.pages) {
       const image = formPage.image;
@@ -176,7 +192,10 @@ export async function buildCompletedPdf({
         image.pixelWidth,
         image.pixelHeight,
       );
-      drawImageInRect(page, await embed(image), image.orientation, rect);
+      // A cleaned scan is the image as seen (already upright), cleaned.
+      const cleaned = cleanedPages.get(formPage.number);
+      if (cleaned) drawImageInRect(page, await output.embedPng(cleaned), 1, rect);
+      else drawImageInRect(page, await embed(image), image.orientation, rect);
     }
   }
 

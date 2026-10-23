@@ -61,3 +61,15 @@ export async function sharpeningDone(page) {
     .first()
     .waitFor({ timeout: 180_000 });
 }
+
+// Waits until every scanned page has been cleaned (or could not be).
+export async function cleaningDone(page) {
+  await page.getByText("Cleaning this scan…").first().waitFor({ state: "detached", timeout: 120_000 });
+}
+
+// Switches cleaning off on every cleaned page.
+export async function switchCleaningOff(page) {
+  for (const box of await page.getByRole("checkbox", { name: "Clean this scan" }).all()) {
+    await box.uncheck();
+  }
+}

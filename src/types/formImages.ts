@@ -30,6 +30,12 @@ export type FormPage = {
   heightPt: number;
   // Only for a form made from images: the picture filling this page.
   image?: LoadedImage;
+  // Whether the page is a scan, which is cleaned: every page made from an
+  // image, and a PDF page that is one picture with no visible text.
+  scan: boolean;
+  // For a PDF page that is a scan: how many pixels per point to draw it
+  // at to keep the scan's own resolution.
+  scanScale?: number;
 };
 
 export type LoadedForm = {

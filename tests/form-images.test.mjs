@@ -7,12 +7,15 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { after, before, test } from "node:test";
-import { startApp } from "./helpers/app.mjs";
+import { seedTemplates, startApp } from "./helpers/app.mjs";
+import { buildSamplePdf, makeTemplate } from "./helpers/fake-data.mjs";
 import {
   A4,
   LETTER,
   buildFakeForm,
+  buildScannedPdf,
   file,
+  makeFakeScan,
   makeImage,
   withExifOrientation,
 } from "./helpers/fake-images.mjs";
@@ -20,9 +23,11 @@ import {
   addFullPageImages,
   chooseBoxImage,
   chooseForm,
+  cleaningDone,
   dragOnPage,
   openFormImages,
   sharpeningDone,
+  switchCleaningOff,
 } from "./helpers/form-images-tool.mjs";
 import { readPdfImages, readStoredImages } from "./helpers/read-pdf-images.mjs";
 import { readPdfText } from "./helpers/read-pdf.mjs";
@@ -136,6 +141,10 @@ test("images as the form: each becomes one A4 page (landscape for a landscape im
     3,
   );
   await page.getByText("scan-1.jpg (3 pages)").waitFor();
+  // Every page is a scan and is cleaned; switched off here, to check the
+  // images as they are (cleaning is tested below).
+  await cleaningDone(page);
+  await switchCleaningOff(page);
 
   const { name, bytes } = await download(page);
   assert.equal(name, "scan-1_completed.pdf");
@@ -670,5 +679,243 @@ test("before and after: both shown side by side, zoomed together", TIMEOUT, asyn
   await dialog.getByRole("button", { name: "4×" }).click();
   const widths = await images.evaluateAll((all) => all.map((image) => image.style.width));
   assert.deepEqual(widths, ["400%", "400%"]);
+  await context.close();
+});
+
+// ------------------------------------------------------------ scan cleaning
+//
+// The fake scan (tests/helpers/fake-images.mjs) is downloaded with cleaning
+// on and with it off, and the two pictures are compared pixel by pixel as
+// the PDF holds them.
+
+const lightness = ([r, g, b]) => 0.299 * r + 0.587 * g + 0.114 * b;
+const closeTo = ([x, y], points, distance) =>
+  points.some(([px, py]) => Math.abs(px - x) <= distance && Math.abs(py - y) <= distance);
+
+async function scanPicture(page) {
+  const [first] = await readPdfImages((await download(page)).bytes, { pixels: true });
+  return first.images[0].pixels;
+}
+
+test("a scanned page is cleaned: the paper made white, the specks and the edge shadow removed; text, lines, stamps, signature and emblem kept", TIMEOUT, async (t) => {
+  const { page, context } = await openTool();
+  const { jpeg, where } = await makeFakeScan(page);
+  await chooseForm(page, [file("scan.jpg", jpeg)], 1);
+  await cleaningDone(page);
+  const status = await page.getByText(/^Cleaned:/).innerText();
+  t.diagnostic(status);
+  assert.equal(status, "Cleaned: paper made white, 3 specks removed, 1 mark along the edge removed.");
+
+  const after = await scanPicture(page);
+  await switchCleaningOff(page);
+  const before = await scanPicture(page);
+  assert.deepEqual([after.width, after.height], [1240, 1754], "cleaned at the scan's own resolution");
+  assert.deepEqual([before.width, before.height], [1240, 1754]);
+
+  for (const point of where.paper) {
+    assert.ok(lightness(before.at(...point)) < 240, `paper at ${point} was not white before`);
+    assert.ok(after.at(...point).every((value) => value >= 250), `paper at ${point} is white: ${after.at(...point)}`);
+  }
+  // Every pixel of ink (dark before), other than what is removed, is
+  // still dark after.
+  let ink = 0;
+  let stillInk = 0;
+  for (let y = 0; y < before.height; y++) {
+    for (let x = 40; x < before.width; x++) {
+      if (closeTo([x, y], where.specks, 8) || lightness(before.at(x, y)) >= 100) continue;
+      ink++;
+      if (lightness(after.at(x, y)) < 130) stillInk++;
+    }
+  }
+  t.diagnostic(`ink pixels kept: ${stillInk} of ${ink}`);
+  assert.ok(ink > 20_000, "the fake scan has plenty of ink");
+  assert.ok(stillInk / ink >= 0.995, `ink kept: ${stillInk} of ${ink}`);
+
+  for (const point of where.redStamp) {
+    const [r, g] = after.at(...point);
+    assert.ok(r > g + 80, `the red stamp is still red at ${point}: ${after.at(...point)}`);
+  }
+  for (const point of where.paleStamp) {
+    const [r, , b] = after.at(...point);
+    assert.ok(b > r + 25 && lightness(after.at(...point)) < 245, `the pale stamp is kept at ${point}: ${after.at(...point)}`);
+  }
+  for (const point of [...where.specks, ...where.shadow]) {
+    assert.ok(after.at(...point).every((value) => value >= 250), `removed at ${point}: ${after.at(...point)}`);
+    assert.ok(lightness(before.at(...point)) < 120, `there was a mark at ${point} before`);
+  }
+  for (const point of where.footerStop) {
+    assert.ok(lightness(after.at(...point)) < 130, "the footer's full stop, next to its text, is kept");
+  }
+  await context.close();
+});
+
+test("a PDF: its scanned page is cleaned (even with an invisible text layer); its text page is left exactly as it is", TIMEOUT, async () => {
+  const { page, context } = await openTool();
+  const { jpeg } = await makeFakeScan(page);
+  await chooseForm(page, [file("scanned.pdf", await buildScannedPdf(jpeg))], 2);
+  await cleaningDone(page);
+  assert.equal(await page.getByRole("checkbox", { name: "Clean this scan" }).count(), 1, "only page 1 is a scan");
+
+  const { bytes } = await download(page);
+  const pages = await readPdfImages(bytes, { pixels: true });
+  assert.equal(pages[0].images.length, 1);
+  const cleaned = pages[0].images[0].pixels;
+  assert.ok(cleaned.at(600, 250).every((value) => value >= 250), `the paper is white: ${cleaned.at(600, 250)}`);
+  assert.ok(lightness(cleaned.at(600, 351)) < 130, `a form line is still dark: ${cleaned.at(600, 351)}`);
+  assert.deepEqual([pages[0].images[0].pixelWidth, pages[0].images[0].pixelHeight], [1240, 1754], "at the scan's resolution");
+  near(pages[0].widthMm, 210, "page 1 keeps its size");
+  assert.equal(pages[1].images.length, 0);
+  const text = await readPdfText(bytes);
+  assert.ok(text[1].items.some((item) => item.text === "FAKE FORM page 2: real text"), "page 2 still has its text");
+  const stored = await readStoredImages(bytes);
+  assert.ok(!stored.some((image) => image.bytes.equals(jpeg)), "the scan was replaced by its cleaned picture");
+  assert.ok(stored.every((image) => image.filter === "/FlateDecode"), "stored losslessly");
+
+  // Switched off: the scanned page is copied exactly as it was.
+  await switchCleaningOff(page);
+  const original = await readStoredImages((await download(page)).bytes);
+  assert.ok(original.some((image) => image.bytes.equals(jpeg)), "the scan's own JPEG, unchanged");
+  await context.close();
+});
+
+test("a scan switched off goes into the PDF unchanged; the before and after can be compared", TIMEOUT, async () => {
+  const { page, context } = await openTool();
+  const { jpeg } = await makeFakeScan(page);
+  await chooseForm(page, [file("scan.jpg", jpeg)], 1);
+  await cleaningDone(page);
+
+  await page.getByRole("button", { name: "Compare before and after" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByText('"scan.jpg, page 1" Zoom in to see the difference; both sides move together.').waitFor();
+  await dialog.locator("img").nth(1).waitFor();
+  assert.equal(await dialog.locator("img").count(), 2);
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "hidden" });
+
+  await switchCleaningOff(page);
+  await page.getByText("Not cleaned: the page goes into the PDF as scanned.").waitFor();
+  const stored = await readStoredImages((await download(page)).bytes);
+  assert.equal(stored.length, 1);
+  assert.ok(stored[0].bytes.equals(jpeg), "the scan's own JPEG, unchanged");
+  await context.close();
+});
+
+// ------------------------------------------------------------ saved layouts
+
+const LAYOUTS_KEY = "pdf-editor:form-image-layouts";
+
+async function saveLayoutAs(page, name) {
+  await page.getByLabel("Layout name").fill(name);
+  await page.getByRole("button", { name: /^(Save layout|Replace saved layout)$/ }).click();
+}
+
+test("a layout is saved in this browser: the boxes (page, place, size, limit) and the margin, never the form or the images; it loads on a new form of the same kind", TIMEOUT, async () => {
+  const { page, context } = await openTool();
+  const form = await buildFakeForm([{ size: A4 }, { size: A4 }]);
+  await chooseForm(page, [file("Form TM 1 (fake).pdf", form)], 2);
+  await dragOnPage(page, 1, A4_MM.width, [20, 30], [60, 60]);
+  await setBoxSize(page, "7.8", "5.0");
+  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 780, height: 500 }), { sharpen: false });
+  await dragOnPage(page, 2, A4_MM.width, [100, 150], [130, 170]);
+  await setLimit(page, "10", "10");
+  await page.getByLabel("Margin around each image (mm)").fill("15");
+  await page.getByRole("button", { name: "Set margin" }).click();
+
+  await saveLayoutAs(page, "Form TM 1");
+  await page
+    .getByText('Saved "Form TM 1" in this browser: 2 boxes and the full-page margin. The form and the images are not saved.')
+    .waitFor();
+  await page.getByText("2 boxes, for 2 pages").waitFor();
+  const stored = JSON.parse(await page.evaluate((key) => localStorage.getItem(key), LAYOUTS_KEY));
+  assert.deepEqual(
+    stored.map(({ savedAt: _, ...layout }) => layout),
+    [
+      {
+        name: "Form TM 1",
+        pages: [{ widthMm: 210, heightMm: 297 }, { widthMm: 210, heightMm: 297 }],
+        boxes: [
+          { page: 1, xMm: 20, yMm: 30, widthMm: 78, heightMm: 50, limitWidthMm: 80, limitHeightMm: 80 },
+          { page: 2, xMm: 100, yMm: 150, widthMm: 30, heightMm: 20, limitWidthMm: 100, limitHeightMm: 100 },
+        ],
+        marginMm: 15,
+      },
+    ],
+    "only the boxes and the margin: no image, no form",
+  );
+  const templates = await page.evaluate(() => localStorage.getItem("pdf-editor:templates"));
+  assert.ok(!templates?.includes("Form TM 1"), "not a template");
+
+  // A new form of the same kind, after leaving and coming back.
+  await page.getByRole("button", { name: "Back to templates" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Leave" }).click();
+  await openFormImages(page);
+  await chooseForm(page, [file("Form TM 1 (another, fake).pdf", form)], 2);
+  await page.getByRole("button", { name: 'Load layout "Form TM 1"' }).click();
+  await page
+    .getByText('Loaded "Form TM 1": 2 boxes and a 15 mm full-page margin. Choose the image for each box.')
+    .waitFor();
+  await page.getByRole("button", { name: "Box 1, page 1, 7.8 × 5.0 cm" }).waitFor();
+  await page.getByRole("button", { name: "Box 2, page 2, 3.0 × 2.0 cm" }).click();
+  assert.equal(await page.getByLabel("Limit width in cm").inputValue(), "10.0");
+  assert.equal(await page.getByLabel("Margin around each image (mm)").inputValue(), "15");
+  await page.getByText("No image yet, so not in the PDF: Box 1, Box 2.").waitFor();
+  await context.close();
+});
+
+test("loading a layout on a different form says what differs, leaves out boxes on missing pages, and asks first when there are boxes already", TIMEOUT, async () => {
+  const { page, context } = await openTool();
+  await chooseForm(page, [file("two-pages.pdf", await buildFakeForm([{ size: A4 }, { size: A4 }]))], 2);
+  await dragOnPage(page, 1, A4_MM.width, [20, 30], [60, 60]);
+  await dragOnPage(page, 2, A4_MM.width, [20, 30], [60, 60]);
+  await saveLayoutAs(page, "Two pages");
+
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Use another form" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Choose another form" }).click();
+  await (await chooser).setFiles(file("letter.pdf", await buildFakeForm([{ size: LETTER }])));
+  await page.getByText("letter.pdf (1 page)").waitFor();
+
+  // Box 1 is still there from before: loading asks first.
+  await page.getByRole("button", { name: 'Load layout "Two pages"' }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByText('Load "Two pages"?').waitFor();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await dialog.waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: 'Load layout "Two pages"' }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Load layout" }).click();
+  await page
+    .getByText(
+      '"Two pages" was saved for a form of 2 pages of 21.0 × 29.7 cm; this form has 1 page of 21.5 × 27.9 cm. Its boxes on page 2 were left out. Check the boxes, and move or resize them where needed.',
+    )
+    .waitFor();
+  assert.equal(await page.getByRole("button", { name: /^Box \d, page/ }).count(), 1);
+  await context.close();
+});
+
+test("deleting a saved layout asks first; layouts are kept in this browser only, never in a backup", TIMEOUT, async () => {
+  const { page, context } = await openTool();
+  await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
+  await dragOnPage(page, 1, A4_MM.width, [20, 30], [60, 60]);
+  await saveLayoutAs(page, "Fake layout to delete");
+  await saveLayoutAs(page, "Fake layout to keep");
+
+  await page.getByRole("button", { name: 'Delete layout "Fake layout to delete"' }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByText('"Fake layout to delete" will be removed from this browser. No form or image is affected.').waitFor();
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: 'Load layout "Fake layout to delete"' }).waitFor({ state: "detached" });
+  await page.getByRole("button", { name: 'Load layout "Fake layout to keep"' }).waitFor();
+
+  // A backup of this browser's templates does not carry layouts.
+  await page.getByRole("button", { name: "Back to templates" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Leave" }).click();
+  await seedTemplates(page, [makeTemplate(await buildSamplePdf())], {
+    [LAYOUTS_KEY]: await page.evaluate((key) => localStorage.getItem(key), LAYOUTS_KEY),
+  });
+  const backup = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Back up" }).click();
+  const text = fs.readFileSync(await (await backup).path(), "utf8");
+  assert.ok(text.includes("Fake Form"), "the backup has the template");
+  assert.ok(!text.includes("Fake layout to keep"), "and no layout");
   await context.close();
 });

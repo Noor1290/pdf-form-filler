@@ -314,6 +314,9 @@ test("store interface: only the browser store itself touches the browser's stora
     "lib/dashboardImport.ts",
     "lib/dashboardStore.ts",
     "lib/employerProfile.ts",
+    // Only the saved Form & images layouts: in this browser only, not in
+    // Back up, never sent to the dashboard.
+    "lib/formImages/layouts.ts",
     "lib/template.ts",
     "lib/theme.ts",
   ]);

@@ -23,7 +23,9 @@ function multiply([a1, b1, c1, d1, e1, f1], [a2, b2, c2, d2, e2, f2]) {
 
 const apply = ([a, b, c, d, e, f], [x, y]) => [a * x + c * y + e, b * x + d * y + f];
 
-export async function readPdfImages(bytes) {
+// With `{ pixels: true }`, each image also has its decoded pixels:
+// `pixels.at(x, y)` gives [red, green, blue] (0-255) of its pixel there.
+export async function readPdfImages(bytes, { pixels = false } = {}) {
   const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes), verbosity: 0 }).promise;
   const pages = [];
   for (let number = 1; number <= doc.numPages; number++) {
@@ -53,8 +55,10 @@ export async function readPdfImages(bytes) {
         // Where the image's own top-left pixel lands, to tell which way up
         // it is drawn.
         const [topLeftX, topLeftY] = viewport.convertToViewportPoint(...apply(ctm, [0, 1]));
+        const decoded = await new Promise((resolve) => page.objs.get(args[0], resolve));
         images.push({
-          edgeColour: edgeColourOf(await new Promise((resolve) => page.objs.get(args[0], resolve))),
+          edgeColour: edgeColourOf(decoded),
+          ...(pixels && { pixels: pixelsOf(decoded) }),
           x: Math.min(...xs) * MM_PER_POINT,
           y: Math.min(...ys) * MM_PER_POINT,
           width: (Math.max(...xs) - Math.min(...xs)) * MM_PER_POINT,
@@ -93,6 +97,26 @@ function edgeColourOf(decoded) {
     }
   }
   return values.map((list) => list.sort((a, b) => a - b)[Math.floor(list.length / 2)]);
+}
+
+function pixelsOf(decoded) {
+  const { width, height, data, kind } = decoded ?? {};
+  const channels = kind === 3 ? 4 : kind === 2 ? 3 : kind === 1 ? 0 : null;
+  if (channels === null || !data) return null;
+  return {
+    width,
+    height,
+    at(x, y) {
+      if (channels === 0) {
+        // One bit per pixel, black or white.
+        const bytesPerRow = Math.ceil(width / 8);
+        const bit = (data[y * bytesPerRow + (x >> 3)] >> (7 - (x & 7))) & 1;
+        return bit ? [255, 255, 255] : [0, 0, 0];
+      }
+      const i = (y * width + x) * channels;
+      return [data[i], data[i + 1], data[i + 2]];
+    },
+  };
 }
 
 // pdf.js gives a fill colour as "#rrggbb" or as three numbers.

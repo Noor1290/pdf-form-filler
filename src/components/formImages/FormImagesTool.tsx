@@ -4,6 +4,7 @@ import {
   DownloadIcon,
   FileUpIcon,
   ImageIcon,
+  LayoutTemplateIcon,
   LogOutIcon,
   Trash2Icon,
   UploadIcon,
@@ -23,6 +24,13 @@ import {
   type ImageUse,
 } from "@/components/formImages/Sharpening";
 import { useSharpening } from "@/components/formImages/useSharpening";
+import {
+  BeforeAfterDialog,
+  type BeforeAndAfter,
+} from "@/components/formImages/BeforeAfterDialog";
+import { SavedLayouts } from "@/components/formImages/SavedLayouts";
+import { ScanInfo } from "@/components/formImages/ScanInfo";
+import { useScanCleaning } from "@/components/formImages/useScanCleaning";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,6 +44,7 @@ import { Input } from "@/components/ui/input";
 import { buildCompletedPdf } from "@/lib/formImages/buildPdf";
 import { FormFileError, openForm, type OpenedForm } from "@/lib/formImages/formFiles";
 import { forgetImage, loadImageFile } from "@/lib/formImages/imageFiles";
+import { boxesForForm, layoutOf, type SavedLayout } from "@/lib/formImages/layouts";
 import {
   A4_PORTRAIT_MM,
   DEFAULT_LIMIT_MM,
@@ -51,7 +60,7 @@ import {
 } from "@/lib/formImages/measure";
 import { downloadPdfBytes } from "@/lib/pdf";
 import { useReportUnsaved } from "@/lib/unsavedChanges";
-import type { ImageBox, LoadedImage } from "@/types/formImages";
+import type { FormPage, ImageBox, LoadedImage } from "@/types/formImages";
 
 type FormImagesToolProps = {
   onBack: () => void;
@@ -248,6 +257,33 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
     }
   }
 
+  // ---------------------------------------------------------------- layouts
+
+  // The layout the load dialog was opened for, kept while it fades out.
+  const [loadingLayout, setLoadingLayout] = useState<SavedLayout | null>(null);
+  const [loadOpen, setLoadOpen] = useState(false);
+
+  // The layout's boxes replace the boxes (their images go too); its
+  // margin replaces the margin. The full-page images stay.
+  function applyLayout(layout: SavedLayout) {
+    if (!form) return;
+    for (const box of boxes) letGo(box.image);
+    const { boxes: loaded, mismatch } = boxesForForm(
+      layout,
+      form.pages,
+      (index) => `Box ${index + 1}`,
+    );
+    boxCount.current = loaded.length;
+    setBoxes(loaded);
+    setSelectedId(null);
+    setMarginMm(layout.marginMm);
+    setLoadOpen(false);
+    setNotice(
+      mismatch ??
+        `Loaded "${layout.name}": ${loaded.length} ${loaded.length === 1 ? "box" : "boxes"} and a ${layout.marginMm} mm full-page margin. Choose the image for each box.`,
+    );
+  }
+
   function confirmDeleteBox() {
     if (!deletingBox) return;
     letGo(deletingBox.image);
@@ -305,6 +341,34 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
     })),
   ]);
   const [comparing, setComparing] = useState<ImageUse | null>(null);
+
+  // ----------------------------------------------------------- scan cleaning
+
+  const cleaning = useScanCleaning(form, opened?.pdf ?? null);
+  // The page whose before and after are shown, kept while the dialog fades.
+  const [comparedPage, setComparedPage] = useState<BeforeAndAfter | null>(null);
+  const [pageCompareOpen, setPageCompareOpen] = useState(false);
+
+  function scanInfo(page: FormPage) {
+    if (!page.scan) return null;
+    const state = cleaning.stateOf(page);
+    return (
+      <ScanInfo
+        state={state}
+        on={cleaning.isOn(page)}
+        onSwitch={(on) => cleaning.switchPage(page, on)}
+        onCompare={() => {
+          if (state?.status !== "done") return;
+          setComparedPage({
+            name: `${form?.fileName}, page ${page.number}`,
+            beforeUrl: state.cleaned.beforeUrl,
+            afterUrl: state.cleaned.afterUrl,
+          });
+          setPageCompareOpen(true);
+        }}
+      />
+    );
+  }
   const comparedState = comparing ? sharpening.states[comparing.image.id] : undefined;
 
   function sharpenInfo(image: LoadedImage) {
@@ -334,6 +398,7 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
         fullPageImages,
         marginMm,
         sharpened,
+        cleanedPages: cleaning.cleanedForPdf(),
       });
       const name = fileName.trim() || completedFileName(form.fileName);
       downloadPdfBytes(bytes, /\.pdf$/i.test(name) ? name : `${name}.pdf`);
@@ -424,6 +489,8 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
                 onDrawBox={(rect) => drawBox(page.number, rect)}
                 onMoveBox={moveBox}
                 onAtLimit={(width, height) => setNotice(AT_LIMIT(width, height))}
+                scanInfo={scanInfo(page)}
+                cleanedUrl={cleaning.cleanedUrl(page)}
               />
             ))}
             {fullPageImages.map((image, index) => (
@@ -518,6 +585,8 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
             )}
 
             <FullPageImagesPanel
+              // Shows the margin again when a layout sets it.
+              key={`margin-${marginMm}`}
               images={fullPageImages}
               firstPageNumber={formPageCount + 1}
               sharpenInfo={sharpenInfo}
@@ -532,6 +601,19 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
               onNotAMargin={() =>
                 setNotice("Type the margin in whole millimetres, from 0 to 50.")
               }
+            />
+
+            <SavedLayouts
+              makeLayout={(name) => layoutOf(name, form.pages, boxes, marginMm)}
+              onLoad={(layout) => {
+                if (boxes.length === 0) {
+                  applyLayout(layout);
+                  return;
+                }
+                setLoadingLayout(layout);
+                setLoadOpen(true);
+              }}
+              onMessage={setNotice}
             />
 
             <section className="glass flex flex-col">
@@ -554,14 +636,16 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
                 )}
                 <Button
                   onClick={() => void download()}
-                  disabled={downloading || sharpening.busy}
+                  disabled={downloading || sharpening.busy || cleaning.busy}
                 >
                   <DownloadIcon />
-                  {sharpening.busy
-                    ? "Sharpening images…"
-                    : downloading
-                      ? "Preparing PDF…"
-                      : "Download PDF"}
+                  {cleaning.busy
+                    ? "Cleaning scans…"
+                    : sharpening.busy
+                      ? "Sharpening images…"
+                      : downloading
+                        ? "Preparing PDF…"
+                        : "Download PDF"}
                 </Button>
               </div>
             </section>
@@ -569,11 +653,37 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
         </div>
       )}
 
+      <BeforeAfterDialog
+        open={pageCompareOpen}
+        shown={comparedPage}
+        onClose={() => setPageCompareOpen(false)}
+      />
+
       <CompareDialog
         use={comparedState?.status === "done" ? comparing : null}
         result={comparedState?.status === "done" ? comparedState.result : null}
         onClose={() => setComparing(null)}
       />
+
+      <Dialog open={loadOpen} onOpenChange={setLoadOpen}>
+        <DialogContent>
+          <DialogHeader icon={<LayoutTemplateIcon />}>
+            <DialogTitle>Load "{loadingLayout?.name}"?</DialogTitle>
+            <DialogDescription>
+              The boxes you have now, and the images in them, are replaced by
+              the layout's boxes. The full-page images stay.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLoadOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => loadingLayout && applyLayout(loadingLayout)}>
+              Load layout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={leaving} onOpenChange={(open) => !open && setLeaving(false)}>
         <DialogContent>

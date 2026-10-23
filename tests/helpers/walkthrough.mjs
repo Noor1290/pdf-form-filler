@@ -3,14 +3,16 @@
 // and the accessibility check (which measures contrast at each stop).
 import { createHash } from "node:crypto";
 import { openTemplatesStandin } from "./fake-hub.mjs";
-import { A4, buildFakeForm, file, makeImage } from "./fake-images.mjs";
+import { A4, buildFakeForm, file, makeFakeScan, makeImage } from "./fake-images.mjs";
 import {
   addFullPageImages,
   chooseBoxImage,
   chooseForm,
+  cleaningDone,
   dragOnPage,
   openFormImages,
   sharpeningDone,
+  switchCleaningOff,
 } from "./form-images-tool.mjs";
 import {
   STANDIN_URL,
@@ -378,6 +380,37 @@ export async function walkThrough(app, visit) {
   await snap(page, "form & images: use another form");
   await inDialog(page, "Cancel");
   await closed(page);
+  // Saved layouts.
+  await page.getByLabel("Layout name").fill("Fake layout");
+  await page.getByRole("button", { name: "Save layout", exact: true }).click();
+  await page.getByText('Saved "Fake layout"', { exact: false }).waitFor();
+  await snap(page, "form & images: a layout saved");
+  await page.getByRole("button", { name: 'Load layout "Fake layout"', exact: true }).click();
+  await snap(page, "form & images: load a layout");
+  await inDialog(page, "Cancel");
+  await closed(page);
+  await page.getByRole("button", { name: 'Delete layout "Fake layout"', exact: true }).click();
+  await snap(page, "form & images: delete a layout");
+  await inDialog(page, "Cancel");
+  await closed(page);
+
+  // A scanned form, cleaned.
+  const { jpeg: scan } = await makeFakeScan(page);
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Use another form", exact: true }).click();
+  await inDialog(page, "Choose another form");
+  await (await chooser).setFiles(file("fake-scan.jpg", scan));
+  await page.getByText("fake-scan.jpg (1 page)").waitFor();
+  await cleaningDone(page);
+  await snap(page, "form & images: a scan, cleaned");
+  await page.getByRole("button", { name: "Compare before and after", exact: true }).first().click();
+  await dialog(page).locator("img").nth(1).waitFor();
+  await snap(page, "form & images: a scan, before and after");
+  await page.keyboard.press("Escape");
+  await closed(page);
+  await switchCleaningOff(page);
+  await snap(page, "form & images: a scan, not cleaned");
+
   await page.getByRole("button", { name: "Back to templates", exact: true }).click();
   await snap(page, "form & images: leave?");
   await inDialog(page, "Leave");

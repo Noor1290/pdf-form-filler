@@ -784,6 +784,8 @@ async function formImagesScreen(app) {
   await chooseBoxImage(page, "fake-logo.png", await makeImage(page, { width: 780, height: 500 }));
   await addFullPageImages(page, [file("fake-page.png", await makeImage(page, { width: 60, height: 40 }))]);
   await sharpeningDone(page);
+  await page.getByLabel("Layout name").fill("Fake layout");
+  await page.getByRole("button", { name: "Save layout", exact: true }).click();
   await inspect(page, "form & images: a box and a full-page image");
   summary.focusStops += await tabThroughEverything(page, "form & images");
   for (const opener of [
@@ -791,6 +793,8 @@ async function formImagesScreen(app) {
     "Delete box",
     'Remove "fake-page.png"',
     "Use another form",
+    'Load layout "Fake layout"',
+    'Delete layout "Fake layout"',
     "Back to templates",
   ]) {
     summary.dialogs[opener] = await dialogRoundTrip(page, opener, `form & images: ${opener}`);

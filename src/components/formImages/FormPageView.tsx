@@ -34,6 +34,10 @@ type FormPageViewProps = {
   onMoveBox: (id: string, rect: LiveBox) => void;
   // Told when a box being drawn or resized is held at its size limit.
   onAtLimit: (widthMm: number, heightMm: number) => void;
+  // For a scan: how its cleaning went, and the cleaned picture to show
+  // instead of the scan (null until it is cleaned, or when switched off).
+  scanInfo?: React.ReactNode;
+  cleanedUrl?: string | null;
 };
 
 export function FormPageView({
@@ -46,6 +50,8 @@ export function FormPageView({
   onDrawBox,
   onMoveBox,
   onAtLimit,
+  scanInfo,
+  cleanedUrl,
 }: FormPageViewProps) {
   const scale = pixelsPerMmFor(pointsToMm(page.widthPt));
   const sizeMm = pageMm(page);
@@ -112,8 +118,11 @@ export function FormPageView({
 
   return (
     <figure className="flex flex-col gap-2">
-      <figcaption className="text-sm font-medium text-muted">
-        Page {page.number} of {pageCount}
+      <figcaption className="flex flex-col gap-1">
+        <span className="text-sm font-medium text-muted">
+          Page {page.number} of {pageCount}
+        </span>
+        {scanInfo}
       </figcaption>
       <div
         className="on-paper relative shrink-0 rounded-lg ring-1 ring-line select-none"
@@ -123,8 +132,22 @@ export function FormPageView({
           <PdfPageSurface pdf={pdf} page={page} widthPx={widthPx} heightPx={heightPx} />
         ) : (
           page.image && (
-            <ImagePageSurface page={page} widthPx={widthPx} heightPx={heightPx} />
+            <ImagePageSurface
+              page={page}
+              url={cleanedUrl ?? page.image.url}
+              widthPx={widthPx}
+              heightPx={heightPx}
+            />
           )
+        )}
+        {/* A cleaned PDF scan is the whole page as seen. */}
+        {pdf && cleanedUrl && (
+          <img
+            src={cleanedUrl}
+            alt=""
+            draggable={false}
+            className="absolute inset-0 size-full rounded-lg bg-white"
+          />
         )}
 
         {/* Where boxes are drawn: the whole page, under the boxes. */}
@@ -320,10 +343,13 @@ function PdfPageSurface({
 // fitted and centred, as in the PDF.
 function ImagePageSurface({
   page,
+  url,
   widthPx,
   heightPx,
 }: {
   page: FormPage;
+  // The image's own, or its cleaned version (the same size).
+  url: string;
   widthPx: number;
   heightPx: number;
 }) {
@@ -336,7 +362,7 @@ function ImagePageSurface({
   return (
     <div className="absolute inset-0 overflow-hidden rounded-lg bg-white">
       <img
-        src={page.image.url}
+        src={url}
         alt=""
         draggable={false}
         className="absolute max-w-none"
