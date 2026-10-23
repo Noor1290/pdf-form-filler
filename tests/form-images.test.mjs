@@ -189,7 +189,7 @@ test("PROOF: a box of 7.8 × 5.0 cm measures 7.8 × 5.0 cm in the downloaded PDF
   await setBoxSize(page, "7.8", "5.0");
   assert.equal(await boxLabel(page, "Box 1"), "Box 1 · 7.8 × 5.0 cm");
   // An image with the box's own proportions fills it exactly.
-  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 780, height: 500 }));
+  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 780, height: 500 }), { sharpen: false });
   await page.getByText("Image as placed: 7.8 × 5.0 cm").waitFor();
 
   const { bytes } = await download(page);
@@ -208,7 +208,7 @@ test("an image with other proportions: the whole image, centred in the box, and 
   await dragOnPage(page, 1, A4_MM.width, [20, 30], [60, 60]);
   await setBoxSize(page, "7.8", "5.0");
   // 1000 × 400 is wider than the box: as wide as the box, centred down.
-  await chooseBoxImage(page, "wide-logo.png", await makeImage(page, { width: 1000, height: 400 }));
+  await chooseBoxImage(page, "wide-logo.png", await makeImage(page, { width: 1000, height: 400 }), { sharpen: false });
   const shown = await page.getByText(/^Image as placed:/).innerText();
 
   const [measured] = (await readPdfImages((await download(page)).bytes))[0].images;
@@ -229,7 +229,7 @@ test("drawing and moving a box: the size shown while drawing is the size in the 
 
   // Moved 10 mm right and 5 mm down, by its middle.
   await dragOnPage(page, 1, A4_MM.width, [52, 56], [62, 61]);
-  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 550, height: 320 }));
+  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 550, height: 320 }), { sharpen: false });
 
   const [measured] = (await readPdfImages((await download(page)).bytes))[0].images;
   assertPlaced(measured, { x: 35, y: 45, width: 55, height: 32 }, "the drawn and moved box's image");
@@ -267,7 +267,7 @@ test("a box can't be drawn, resized or typed past its 8 × 8 cm limit, and says 
   await limitNotice.waitFor();
   assert.equal(await page.getByLabel("Box width in cm").inputValue(), "8.0");
 
-  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 800, height: 500 }));
+  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 800, height: 500 }), { sharpen: false });
   const [measured] = (await readPdfImages((await download(page)).bytes))[0].images;
   assertPlaced(measured, { x: 10, y: 10, width: 80, height: 50 }, "the box at its limit");
   await context.close();
@@ -295,7 +295,7 @@ test("changing a box's limit: a larger one lets it grow to it, a smaller one mak
   assert.equal(await boxLabel(page, "Box 1"), "Box 1 · 6.0 × 6.0 cm");
   assert.equal(await page.getByLabel("Limit width in cm").inputValue(), "6.0");
 
-  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 600, height: 600 }));
+  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 600, height: 600 }), { sharpen: false });
   const [measured] = (await readPdfImages((await download(page)).bytes))[0].images;
   assertPlaced(measured, { x: 10, y: 10, width: 60, height: 60 }, "the box after its limit was lowered");
   await context.close();
@@ -308,7 +308,7 @@ test("boxes on a later page, and on a page saved turned, land exactly where they
   // Page 2 is seen landscape: 297 mm wide.
   await dragOnPage(page, 2, 297, [20, 30], [98, 80]);
   assert.equal(await boxLabel(page, "Box 1"), "Box 1 · 7.8 × 5.0 cm");
-  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 780, height: 500 }));
+  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 780, height: 500 }), { sharpen: false });
   await page.getByRole("button", { name: "Box 1, page 2, 7.8 × 5.0 cm" }).waitFor();
 
   const pages = await readPdfImages((await download(page)).bytes);
@@ -325,7 +325,7 @@ test("a phone photo stored sideways is placed upright, with its JPEG unchanged",
   await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
   await dragOnPage(page, 1, A4_MM.width, [10, 10], [90, 90]);
   const photo = withExifOrientation(await makeImage(page, { width: 400, height: 200, type: "jpeg" }), 6);
-  await chooseBoxImage(page, "photo.jpg", photo);
+  await chooseBoxImage(page, "photo.jpg", photo, { sharpen: false });
   await page.getByText("Image as placed: 4.0 × 8.0 cm").waitFor();
 
   const { bytes } = await download(page);
@@ -344,7 +344,7 @@ test("deleting a box asks first, and removes it and its image from the PDF", TIM
   const { page, context } = await openTool();
   await chooseForm(page, [file("fake-form.pdf", await buildFakeForm([{ size: A4 }]))], 1);
   await dragOnPage(page, 1, A4_MM.width, [10, 10], [50, 50]);
-  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 100, height: 100 }));
+  await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 100, height: 100 }), { sharpen: false });
   await dragOnPage(page, 1, A4_MM.width, [100, 100], [150, 150]);
   await page.getByText("No image yet, so not in the PDF: Box 2.").waitFor();
 
@@ -448,9 +448,9 @@ test("full resolution: a JPEG is embedded unchanged (once, however often used), 
   const photo = await makeImage(page, { width: 2400, height: 1600, type: "jpeg", quality: 0.95 });
   const logo = await makeImage(page, { width: 1200, height: 900 });
   await dragOnPage(page, 1, A4_MM.width, [10, 10], [70, 70]);
-  await chooseBoxImage(page, "photo.jpg", photo);
+  await chooseBoxImage(page, "photo.jpg", photo, { sharpen: false });
   await dragOnPage(page, 1, A4_MM.width, [100, 100], [160, 160]);
-  await chooseBoxImage(page, "logo.png", logo);
+  await chooseBoxImage(page, "logo.png", logo, { sharpen: false });
   await addFullPageImages(page, [file("photo-again.jpg", photo)]);
 
   const stored = await readStoredImages((await download(page)).bytes);
@@ -533,13 +533,16 @@ function storedSizes(stored) {
     .sort();
 }
 
-test("how sharp each image will print is shown; sharpening is on by default for full-page images, off for images in boxes", TIMEOUT, async () => {
+test("how sharp each image will print is shown; sharpening is on by default for every image that needs it, in a box or on a full page, and can be switched off", TIMEOUT, async () => {
   const { page, context } = await openTool();
   await aFormWithABox(page, [10, 10], [50, 40]);
   // 400 px across 4.0 cm: 254 dpi.
   await chooseBoxImage(page, "logo.png", await makeImage(page, { width: 400, height: 300 }));
   const boxSwitch = page.getByRole("checkbox", { name: "Sharpen with AI (254 dpi at this size)" });
-  assert.equal(await boxSwitch.isChecked(), false, "off for an image in a box");
+  assert.equal(await boxSwitch.isChecked(), true, "on for an image in a box");
+  // Switched off: no sharpening, and nothing for the download to wait for.
+  await boxSwitch.uncheck();
+  assert.equal(await page.getByText(/^Sharpening…|^Waiting to be sharpened/).count(), 0);
 
   // 100 px across 19 cm: 13 dpi.
   await addFullPageImages(page, [file("tiny.png", await makeImage(page, { width: 100, height: 80 }))]);
@@ -560,7 +563,11 @@ test("AI sharpening: enlarged by the model to 300 dpi at the printed size, embed
   // 64 px across 2.0 cm: 81 dpi. Sharpened, it needs 236 px (300 dpi),
   // which four times 64 (256) covers.
   await chooseBoxImage(page, "small-logo.jpg", await makeImage(page, { width: 64, height: 48, type: "jpeg" }));
-  await page.getByRole("checkbox", { name: "Sharpen with AI (81 dpi at this size)" }).check();
+  assert.equal(
+    await page.getByRole("checkbox", { name: "Sharpen with AI (81 dpi at this size)" }).isChecked(),
+    true,
+    "on without being asked",
+  );
   await page.getByText("Sharpened with AI: prints at 300 dpi.").waitFor({ timeout: 180_000 });
   // 40 px across 19 cm: even four times as large, 21 dpi.
   await addFullPageImages(page, [file("tiny.png", await makeImage(page, { width: 40, height: 30 }))]);
@@ -594,11 +601,11 @@ test("AI sharpening: enlarged by the model to 300 dpi at the printed size, embed
   await context.close();
 });
 
-test("sharpening switched off, or not switched on: the original is embedded unchanged", TIMEOUT, async () => {
+test("sharpening switched off: the original is embedded unchanged", TIMEOUT, async () => {
   const { page, context } = await openTool();
   await aFormWithABox(page, [20, 30], [40, 45]);
   const logo = await makeImage(page, { width: 64, height: 48, type: "jpeg" });
-  await chooseBoxImage(page, "small-logo.jpg", logo);
+  await chooseBoxImage(page, "small-logo.jpg", logo, { sharpen: false });
   const photo = await makeImage(page, { width: 300, height: 200, type: "jpeg" });
   await addFullPageImages(page, [file("photo.jpg", photo)], { sharpen: false });
 

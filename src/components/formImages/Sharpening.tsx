@@ -22,8 +22,8 @@ export type SharpenState =
 export type ImageUse = {
   image: LoadedImage;
   printedWidthMm: number;
-  // Sharpening is on unless switched off (full-page images), or off
-  // unless switched on (images in boxes), as the owner asked.
+  // Switched on: until it is switched off, every image that would print
+  // under about 300 dpi is sharpened, in a box or on a full page.
   on: boolean;
 };
 

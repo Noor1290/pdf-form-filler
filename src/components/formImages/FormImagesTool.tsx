@@ -290,19 +290,18 @@ export default function FormImagesTool({ onBack }: FormImagesToolProps) {
 
   // ------------------------------------------------------------ sharpening
 
-  // Every image in use, with the width it prints at. Full-page images are
-  // sharpened unless switched off; images in boxes only when switched on.
+  // Every image in use, in a box or on a full page, with the width it
+  // prints at.
   const sharpening = useSharpening([
     ...boxes.flatMap((box) => {
       const placed = placedImageMm(box);
       return box.image && placed
-        ? [{ image: box.image, printedWidthMm: placed.width, onByDefault: false }]
+        ? [{ image: box.image, printedWidthMm: placed.width }]
         : [];
     }),
     ...fullPageImages.map((image) => ({
       image,
       printedWidthMm: fullPageImageMm(image.pixelWidth, image.pixelHeight, marginMm).width,
-      onByDefault: true,
     })),
   ]);
   const [comparing, setComparing] = useState<ImageUse | null>(null);

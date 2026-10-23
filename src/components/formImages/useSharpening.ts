@@ -7,21 +7,20 @@ import type { LoadedImage } from "@/types/formImages";
 export type ImageUseInput = {
   image: LoadedImage;
   printedWidthMm: number;
-  // Whether sharpening is on until the person switches it.
-  onByDefault: boolean;
 };
 
-// Sharpening for every image in use: which are switched on, and the
-// model's work on each, one image at a time, started as soon as an image
-// is placed where it would print under about 300 dpi.
+// Sharpening for every image in use: which are switched off (all are on
+// until switched off), and the model's work on each, one image at a time,
+// started as soon as an image is placed where it would print under about
+// 300 dpi.
 export function useSharpening(inputs: ImageUseInput[]) {
   const [choices, setChoices] = useState<Record<string, boolean>>({});
   const [states, setStates] = useState<Record<string, SharpenState>>({});
 
   const uses = new Map<string, ImageUse>(
-    inputs.map(({ image, printedWidthMm, onByDefault }) => [
+    inputs.map(({ image, printedWidthMm }) => [
       image.id,
-      { image, printedWidthMm, on: choices[image.id] ?? onByDefault },
+      { image, printedWidthMm, on: choices[image.id] ?? true },
     ]),
   );
   const wanted = [...uses.values()].filter(

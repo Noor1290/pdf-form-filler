@@ -28,13 +28,17 @@ export async function dragOnPage(page, pageNumber, widthMm, from, to, { release 
   if (release) await page.mouse.up();
 }
 
-export async function chooseBoxImage(page, name, buffer) {
+// Images are sharpened unless switched off; `sharpen: false` switches it
+// off for an image that would be sharpened.
+export async function chooseBoxImage(page, name, buffer, { sharpen = true } = {}) {
   await page.getByTestId("box-image-input").setInputFiles(file(name, buffer));
   await page.getByText("Image as placed:").waitFor();
+  if (sharpen) return;
+  const settings = page.locator('section[aria-label$=" settings"]');
+  const switchOn = settings.getByRole("checkbox", { name: /^Sharpen with AI/ });
+  if (await switchOn.count()) await switchOn.uncheck();
 }
 
-// Full-page images are sharpened unless switched off; `sharpen: false`
-// switches it off for each image added that would be sharpened.
 export async function addFullPageImages(page, files, { sharpen = true } = {}) {
   const before = await page.getByRole("button", { name: /^Remove "/ }).count();
   await page.getByTestId("full-page-images-input").setInputFiles(files);
