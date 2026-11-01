@@ -11,6 +11,8 @@ export type HubFailureCode =
   | "not-found"
   | "too-large"
   | "unavailable"
+  // The signed-in account belongs to no company.
+  | "no-company"
   // The dashboard did not answer at all (the bridge gave up waiting).
   | "no-answer"
   // An older dashboard that does not know these data types yet.
@@ -48,6 +50,7 @@ const KNOWN_CODES: readonly string[] = [
   "not-found",
   "too-large",
   "unavailable",
+  "no-company",
 ];
 
 function failureOf(reply: { error?: unknown; code?: unknown }): HubFailure {

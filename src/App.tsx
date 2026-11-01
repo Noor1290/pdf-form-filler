@@ -59,7 +59,13 @@ const { deleteTemplate, getTemplate, listTemplates, renameTemplate } =
 // older one that does not keep templates yet.
 // "offline" is this browser's last copy of a company's templates from the
 // dashboard, opened read-only because the dashboard could not be reached.
-type Kept = "browser" | "starting" | "dashboard" | "failed" | "offline";
+type Kept =
+  | "browser"
+  | "starting"
+  | "dashboard"
+  | "failed"
+  | "no-company"
+  | "offline";
 
 type View =
   | { name: "home" }
@@ -113,7 +119,7 @@ function App() {
       setKept("browser");
     } else {
       setStartProblem(result.error);
-      setKept("failed");
+      setKept(result.code === "no-company" ? "no-company" : "failed");
     }
   }, []);
 
@@ -312,6 +318,16 @@ function App() {
           <p role="status" className="text-sm text-muted">
             Loading the templates from the dashboard…
           </p>
+        )}
+
+        {kept === "no-company" && (
+          <div
+            role="alert"
+            className="notice-panel notice-danger w-full max-w-2xl flex-wrap items-center"
+          >
+            <CircleAlertIcon />
+            <span className="min-w-48 flex-1">{startProblem}</span>
+          </div>
         )}
 
         {kept === "failed" && (

@@ -120,6 +120,20 @@ test("an older dashboard that does not keep templates: the tool uses this browse
   await context.close();
 });
 
+test("an account with no company is told so, with nothing else offered", TIMEOUT, async () => {
+  const sentence = "Your account isn't a member of any company in the dashboard yet. Ask an admin to add you.";
+  const { context, frame, hub } = await openInDashboard();
+  await loaded(frame);
+  await hub.set((error) => (window.hub.state.failNext = { dataType: "pdf-template", action: "list", code: "no-company", error }), sentence);
+  await frame.evaluate(() => location.reload());
+
+  const alert = frame.getByRole("alert");
+  await alert.waitFor();
+  assert.equal((await alert.innerText()).replace(/\s+/g, " ").trim(), sentence);
+  assert.equal(await frame.getByRole("button", { name: "Try again" }).count(), 0);
+  await context.close();
+});
+
 test("when the dashboard cannot be reached at the start, the tool says so and offers Try again", TIMEOUT, async () => {
   const { context, frame, hub } = await openInDashboard();
   await loaded(frame);
