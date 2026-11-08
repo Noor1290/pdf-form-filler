@@ -232,9 +232,28 @@
     "text: Delete the saved layout?",
     "text: Load \"Fake layout\"?",
     "text: Load layout",
-    "text: The boxes you have now, and the images in them, are replaced by the layout's boxes. The full-page images stay."
+    "text: The boxes you have now, and the images in them, are replaced by the layout's boxes. The full-page images stay.",
+    "text: \"ID number\" gently warns if what's typed doesn't look like a Mauritian ID number. It prints exactly as typed.",
+    "text: ID number",
+    "aria-label: Delete Person 1: Wroński Test",
+    "aria-label: Delete Person 2: Sampleton-Placeholder",
+    "text: Clear the People list",
+    "text: Downloaded: 3 people in one PDF.",
+    "text: Keep it",
+    "text: Person 1: Wroński Test",
+    "text: Person 2: Sampleton-Placeholder",
+    "text: The People list stays in this browser until you clear it.",
+    "aria-label: Delete Person 1: Testperson",
+    "aria-label: Delete Person 2: Sampleton",
+    "text: Person 1: Testperson",
+    "text: Person 2: Sampleton",
+    "text: Person 1: Wroński Test, Surname: ń line break or tab"
   ],
   "removed": [
-    "text: Statement of Emoluments Tool"
+    "text: Statement of Emoluments Tool",
+    "aria-label: Delete Person 1",
+    "aria-label: Delete Person 2",
+    "text: Person 1",
+    "text: Person 2"
   ]
 }
