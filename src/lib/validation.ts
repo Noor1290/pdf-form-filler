@@ -10,10 +10,16 @@ const AMOUNT_NAME_KEYWORDS = ["amount", "salary", "total", "sum"];
 // joined") is a Date box: it prints its date as DD/MM/YYYY (see dates.ts).
 const DATE_NAME_WORD = /\bdate\b/i;
 
+// A box named for a national ID ("NIC", "National ID", "ID number", "ID
+// No") is an ID number box. A box named just "ID" stays text: it may hold
+// any kind of reference.
+const ID_NUMBER_NAME = /\b(nic|national id|id number|id no)\b/i;
+
 export function inferValidationType(
   boxName: string,
 ): NonNullable<FieldBox["validationType"]> {
   if (DATE_NAME_WORD.test(boxName)) return "date";
+  if (ID_NUMBER_NAME.test(boxName)) return "idNumber";
   const normalized = boxName.toLowerCase();
   return AMOUNT_NAME_KEYWORDS.some((keyword) => normalized.includes(keyword))
     ? "amount"
@@ -35,10 +41,22 @@ export function validateFieldValue(
   validationType: FieldBox["validationType"],
   value: string,
 ): string | null {
-  if (validationType !== "amount") return null;
   const trimmed = value.trim();
   if (trimmed === "") return null;
+  if (validationType === "idNumber") return idNumberWarning(trimmed);
+  if (validationType !== "amount") return null;
 
   const result = amountSchema.safeParse(trimmed);
   return result.success ? null : result.error.issues[0].message;
+}
+
+// A Mauritian national ID number: 14 characters, a letter then letters and
+// digits (spaces ignored). Like the amount check it only warns, and a
+// passport number is fine: the warning says so.
+const ID_NUMBER = /^[A-Z][A-Z0-9]{13}$/i;
+
+function idNumberWarning(value: string): string | null {
+  return ID_NUMBER.test(value.replace(/\s/g, ""))
+    ? null
+    : "This doesn't look like a Mauritian ID number (a letter, then 13 letters or digits). A passport number is fine.";
 }

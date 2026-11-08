@@ -122,6 +122,9 @@ async function openApp(templates) {
 }
 
 const dialog = (page) => page.getByRole("dialog").last();
+// A person in the People list: "Person 2", or "Person 2: TESTER Beta" once a
+// name box is filled (C12).
+const personButton = (page, n) => page.getByRole("button", { name: new RegExp(`^Person ${n}(: |$)`) });
 
 async function chooseImportFile(page, name, content) {
   await page.locator('input[type="file"]').setInputFiles(app.writeTempFile(name, content));
@@ -264,7 +267,7 @@ test("import: Add to keeps the people already there; Replace asks first, then sw
   assert.ok((await dialog(page).textContent()).includes("This will remove the 5 people already added and replace them with the 1 from this file."));
   await dialog(page).getByRole("button", { name: "Cancel" }).click();
   // (Counted in the page itself: the list is behind the open dialog.)
-  assert.equal(await page.locator("li button", { hasText: /^Person \d+$/ }).count(), 5);
+  assert.equal(await page.locator("li button", { hasText: /^Person \d+(: .+)?$/ }).count(), 5);
   await dialog(page).getByRole("button", { name: "Import 1 person" }).click();
   await dialog(page).getByRole("button", { name: "Replace all" }).click();
   await page.getByRole("dialog").first().waitFor({ state: "hidden" });
@@ -367,7 +370,7 @@ test("after leaving and coming back, the download still has one page per person,
   assert.equal(await peopleCount(page), 3);
   // The form shows the third person, and the list says so.
   assert.equal(await page.getByLabel("ID", { exact: true }).inputValue(), "TST003");
-  assert.equal(await page.getByRole("button", { name: "Person 3", exact: true }).getAttribute("aria-current"), "true");
+  assert.equal(await personButton(page, 3).getAttribute("aria-current"), "true");
   const pages = await readVisualText((await download(page)).bytes);
   assert.deepEqual(
     pages.map((p) => p.items.find((i) => /^TST/.test(i.text))?.text),
@@ -414,7 +417,7 @@ test("clicking another person keeps the person being typed: they are added to th
   const { context, page } = await openApp([template(pdf, { employerFields })]);
   await openFillScreen(page, "TEST Form");
   const field = (name) => page.getByLabel(name, { exact: true });
-  const person = (n) => page.getByRole("button", { name: `Person ${n}`, exact: true });
+  const person = (n) => personButton(page, n);
 
   await field("Surname").fill("TESTER");
   await field("ID").fill("TST001");
@@ -478,7 +481,7 @@ test("Clear all removes the listed people and leaves the person being typed in t
 
   // When the form shows one of the listed people, it is emptied with them.
   await page.getByRole("button", { name: "Add & fill next person" }).click();
-  await page.getByRole("button", { name: "Person 1", exact: true }).click();
+  await personButton(page, 1).click();
   assert.equal(await field("ID").inputValue(), "TST002");
   await clearAll();
   assert.equal(await peopleCount(page), 0);
@@ -503,7 +506,7 @@ test("a value longer than its box is said beside its field; the PDF still draws 
   const long = "TESTER-WITH-A-VERY-LONG-DOUBLE-BARRELLED-SURNAME-INDEED";
   const { context, page } = await openApp([template(pdf, { entries: entriesFor([{ ...PEOPLE[0], Surname: long, "Basic Salary": "1,234,567,890,123,456,789.00" }]) })]);
   await openFillScreen(page, "TEST Form");
-  await page.getByRole("button", { name: "Person 1", exact: true }).click();
+  await personButton(page, 1).click();
   await page.getByText(TOO_WIDE).first().waitFor();
   assert.deepEqual((await tooWideFields(page)).sort(), ["field-b-basic", "field-b-surname"].sort());
   // Shortened, the warning goes.
@@ -533,7 +536,7 @@ test("a character the PDF fonts cannot print is replaced with \"?\" in its own f
   ];
   const { context, page } = await openApp([template(pdf, { entries: entriesFor(people) })]);
   await openFillScreen(page, "TEST Form");
-  await page.getByRole("button", { name: "Person 1", exact: true }).click();
+  await personButton(page, 1).click();
 
   const file = await download(page);
   const pages = await readVisualText(file.bytes);
@@ -558,15 +561,15 @@ test("a character the PDF fonts cannot print is replaced with \"?\" in its own f
   const report = dialog(page);
   await report.getByText("Some characters could not be printed").waitFor();
   assert.deepEqual(await report.locator("li").allTextContents(), [
-    "Person 2, Surname: ń",
-    "Person 2, Other Names: Ł",
-    "Person 3, Other Names: line break or tab",
+    "Person 2: TESTER-Wroński Łukasz Renée, Surname: ń",
+    "Person 2: TESTER-Wroński Łukasz Renée, Other Names: Ł",
+    "Person 3: TESTER Gamma Delta, Other Names: line break or tab",
   ]);
   assert.equal(await page.locator(".notice-danger").count(), 0, "no error is shown");
   await report.getByRole("button", { name: "OK" }).click();
   await page.getByRole("dialog").first().waitFor({ state: "hidden" });
   // What is stored and shown on screen is still what was typed.
-  await page.getByRole("button", { name: "Person 2", exact: true }).click();
+  await personButton(page, 2).click();
   assert.equal(await page.getByLabel("Other Names", { exact: true }).inputValue(), "Łukasz Renée");
   await context.close();
 });
@@ -831,7 +834,7 @@ test("what is typed in the last moment before leaving the fill-in screen is save
 
   // A listed person's surname changed, then "Edit fields" at once: the
   // People list is stored too, not only the form.
-  await page.getByRole("button", { name: "Person 2", exact: true }).click();
+  await personButton(page, 2).click();
   await readStoredTemplates(page); // gives the app time to save
   await field("Surname").fill("LASTMOMENT");
   await page.getByRole("button", { name: "Edit fields" }).click();
@@ -1022,7 +1025,7 @@ test("Date box: data delivered by the dashboard (YYYY-MM-DD) prints DD/MM/YYYY",
   await context.close();
 });
 
-test("a new box named with the word \"date\" is a Date box, as \"salary\" makes an Amount box", TIMEOUT, async () => {
+test("a new box named with the word \"date\" is a Date box, as \"salary\" makes an Amount box and \"NIC\" an ID number box (D20)", TIMEOUT, async () => {
   const pdf = await blankForm();
   const { context, page } = await openApp([template(pdf, { boxes: [] })]);
   await page.getByRole("button", { name: "Edit fields" }).click();
@@ -1032,6 +1035,7 @@ test("a new box named with the word \"date\" is a Date box, as \"salary\" makes 
     ["Date of Employment", 300],
     ["Basic Salary", 360],
     ["Update reference", 420],
+    ["NIC", 480],
   ]) {
     await page.mouse.move(canvas.x + 60, canvas.y + at);
     await page.mouse.down();
@@ -1042,11 +1046,94 @@ test("a new box named with the word \"date\" is a Date box, as \"salary\" makes 
     await page.getByRole("dialog").waitFor({ state: "hidden" });
   }
   await page.getByRole("button", { name: "Save template" }).click();
-  await page.waitForFunction(() => (JSON.parse(localStorage.getItem("pdf-editor:templates") ?? "[]")[0]?.boxes ?? []).length === 3);
+  await page.waitForFunction(() => (JSON.parse(localStorage.getItem("pdf-editor:templates") ?? "[]")[0]?.boxes ?? []).length === 4);
   const [stored] = await readStoredTemplates(page);
   assert.deepEqual(
     Object.fromEntries(stored.boxes.map((b) => [b.name, b.validationType])),
-    { "Date of Employment": "date", "Basic Salary": "amount", "Update reference": "text" },
+    { "Date of Employment": "date", "Basic Salary": "amount", "Update reference": "text", NIC: "idNumber" },
   );
+  await context.close();
+});
+
+// ============================================ cleanup, Stage 3 (8 Nov 2026)
+
+test("C12: the People list names each person from their name boxes and keeps the page number; the company name is not a person's name", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const people = [...PEOPLE, { ID: "TST009", "Basic Salary": "1.00" }];
+  const { context, page } = await openApp([template(pdf, { entries: entriesFor(people) })]);
+  await openFillScreen(page, "TEST Form");
+  const labels = [];
+  for (const n of [1, 2, 3, 4]) labels.push((await personButton(page, n).textContent()).trim());
+  assert.deepEqual(labels, ["Person 1: TESTER Alpha", "Person 2: TESTER Beta", "Person 3: TESTER Gamma", "Person 4"]);
+  assert.equal(await page.getByRole("button", { name: "Delete Person 2: TESTER Beta", exact: true }).count(), 1);
+  await context.close();
+});
+
+test("C12: \"Last updated\" on the template list is day first, DD/MM/YYYY", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context, page } = await openApp([template(pdf, { updatedAt: "2026-10-17T10:00:00.000Z" })]);
+  const row = page.getByRole("button", { name: /^TEST Form Last updated/ });
+  assert.match(await row.textContent(), /Last updated 17\/10\/2026/);
+  await context.close();
+});
+
+test("C10 and D21: after a download of several people it says how many have a value too long for its box, and offers to clear the People list, which is never cleared on its own", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const long = "TESTER-WITH-A-VERY-LONG-DOUBLE-BARRELLED-SURNAME-INDEED";
+  const people = [PEOPLE[0], { ...PEOPLE[1], Surname: long }, { ...PEOPLE[2], "Basic Salary": "1,234,567,890,123,456,789.00" }];
+  const { context, page } = await openApp([template(pdf, { entries: entriesFor(people) })]);
+  await openFillScreen(page, "TEST Form");
+  await personButton(page, 2).click();
+  await page.getByText(TOO_WIDE).first().waitFor(); // the fonts are measured
+  await personButton(page, 1).click();
+  assert.equal((await readVisualText((await download(page)).bytes)).length, 3);
+
+  const notice = page.getByTestId("after-batch");
+  await notice.waitFor();
+  const text = (await notice.textContent()).replace(/\s+/g, " ");
+  assert.ok(text.includes("Downloaded: 3 people in one PDF."), text);
+  assert.ok(text.includes("2 people have a value too long for its box. On the PDF it runs past the edge of the box:"), text);
+  assert.deepEqual(await notice.locator("li").allTextContents(), [`Person 2: ${long} Beta`, "Person 3: TESTER Gamma"]);
+  assert.ok(text.includes("The People list stays in this browser until you clear it."), text);
+  assert.equal(await peopleCount(page), 3, "nothing is cleared on its own");
+
+  // "Keep it" only puts the offer away.
+  await notice.getByRole("button", { name: "Keep it" }).click();
+  await notice.waitFor({ state: "hidden" });
+  assert.equal(await peopleCount(page), 3);
+
+  // "Clear the People list" asks first, as "Clear all" does.
+  await download(page);
+  await notice.getByRole("button", { name: "Clear the People list" }).click();
+  assert.ok((await dialog(page).textContent()).includes("This will remove everyone added to this batch (3 people)."));
+  await dialog(page).getByRole("button", { name: "Clear all" }).click();
+  await page.getByRole("dialog").first().waitFor({ state: "hidden" });
+  assert.equal(await peopleCount(page), 0);
+  assert.equal(await notice.count(), 0);
+
+  // One person alone: no list, so nothing is offered.
+  await page.getByLabel("ID", { exact: true }).fill("TST010");
+  await download(page);
+  assert.equal(await notice.count(), 0);
+  await context.close();
+});
+
+const NOT_AN_ID = "This doesn't look like a Mauritian ID number (a letter, then 13 letters or digits). A passport number is fine.";
+
+test("D20: an ID number box warns when what is typed does not look like a Mauritian ID number, and prints exactly what was typed", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const boxes = BOXES.map((b) => (b.name === "ID" ? { ...b, name: "NIC", validationType: "idNumber" } : b));
+  const { context, page } = await openApp([template(pdf, { boxes })]);
+  await openFillScreen(page, "TEST Form");
+  const nic = page.getByLabel("NIC", { exact: true });
+  await nic.fill("TST 12");
+  await page.getByText(NOT_AN_ID).waitFor();
+  await nic.fill("X0000000000077");
+  await page.getByText(NOT_AN_ID).waitFor({ state: "hidden" });
+  await nic.fill("x 000000 000007 7");
+  assert.equal(await page.getByText(NOT_AN_ID).count(), 0, "small letters and spaces are fine");
+  await nic.fill("TST 12");
+  const [first] = await readVisualText((await download(page)).bytes);
+  assert.equal(first.items.filter((i) => i.text === "TST 12").length, 1, "printed exactly as typed");
   await context.close();
 });

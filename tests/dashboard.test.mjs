@@ -277,7 +277,7 @@ test("the values typed into a form and the People list stay in this browser: not
   await frame.evaluate(() => location.reload());
   await loaded(frame);
   await openFillScreen(frame, "Dashboard Form");
-  assert.equal(await frame.getByRole("button", { name: /^Person \d+$/ }).count(), 1);
+  assert.equal(await frame.getByRole("button", { name: /^Person \d+(: .+)?$/ }).count(), 1);
   await context.close();
 });
 
@@ -559,7 +559,7 @@ test("import: each template is stored, checked against this browser's copy and n
   // The list shows it, with its two people.
   await row(frame, "Browser Only Form").waitFor();
   await openFillScreen(frame, "Browser Only Form");
-  assert.equal(await frame.getByRole("button", { name: /^Person \d+$/ }).count(), 2);
+  assert.equal(await frame.getByRole("button", { name: /^Person \d+(: .+)?$/ }).count(), 2);
   await button(frame, "Back to templates").click();
 
   // What is left is the one with a conflict. This time: replace the dashboard's with this browser's.

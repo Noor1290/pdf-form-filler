@@ -186,11 +186,11 @@ test(
     await page.getByRole("button", { name: "Add & fill next person" }).click();
     recording.peopleAfterAddingBoth = await peopleCount(page);
 
-    await page.getByRole("button", { name: "Person 1", exact: true }).click();
+    await page.getByRole("button", { name: /^Person 1(: |$)/ }).click();
     await typeInto(page, { "Net Pay": "44,000.00" });
-    await page.getByRole("button", { name: "Person 2", exact: true }).click();
+    await page.getByRole("button", { name: /^Person 2(: |$)/ }).click();
     recording.personTwoForm = await formValues(page);
-    await page.getByRole("button", { name: "Person 1", exact: true }).click();
+    await page.getByRole("button", { name: /^Person 1(: |$)/ }).click();
     recording.personOneFormAfterEdit = await formValues(page);
     recording.twoPeopleDownload = await downloadAndRead(page);
 

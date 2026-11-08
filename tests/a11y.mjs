@@ -385,7 +385,7 @@ async function fillInScreen(app) {
   await page.getByLabel("Surname", { exact: true }).fill("Sampleton");
   await page.getByLabel("Net Pay", { exact: true }).fill("not a number");
   await page.getByRole("button", { name: "Add & fill next person" }).click();
-  await page.getByRole("button", { name: "Person 2", exact: true }).click();
+  await page.getByRole("button", { name: "Person 2: Sampleton", exact: true }).click();
   await inspect(page, "fill-in: two people, a warning");
 
   await page.getByRole("button", { name: "Positions locked" }).click();
@@ -395,7 +395,7 @@ async function fillInScreen(app) {
   summary.focusStops = await tabThroughEverything(page, "fill-in");
 
   summary.dialogs = {};
-  for (const opener of ["Clear values", "Delete Person 1", "Clear all"]) {
+  for (const opener of ["Clear values", "Delete Person 1: Testperson", "Clear all"]) {
     const button = page.getByRole("button", { name: opener, exact: true }).first();
     await button.click();
     await page.getByRole("dialog").waitFor();

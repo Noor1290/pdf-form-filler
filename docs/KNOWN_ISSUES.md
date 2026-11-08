@@ -278,11 +278,21 @@ screen". All three fail without the fix.
 
 **What changed:** src/components/FieldForm.tsx only. No wording was added.
 
+# Fixed in the cleanup, Stage 3 (8 November 2026, branch `cleanup`)
+
+Each has a test in `tests/audit.test.mjs` that failed before the fix.
+
+- **The People list names people (payroll TODO C12).** It said "Person 1", "Person 2"... Each person is now "Person 2: TESTER Beta", from the boxes named for a name ("Surname", "Other Names", "Employee name"...), in the form's order. A box named for the company or the employer, or filled from the company details, is never used. With no name typed it stays "Person 2". The number stays: it is the person's page in the PDF. The list of characters that could not be printed uses the same names. (`src/lib/people.ts`)
+- **"Last updated" is day first (TODO C12).** It used the browser's own order (10/17/2026 on an English-US browser); it is now 17/10/2026 everywhere. (`shownDate` in `src/lib/dates.ts`)
+- **At a download of several people, how many have a value too long for its box (TODO C10).** The fill-in screen said it only beside the field of the person shown. After the download the People card now says "2 people have a value too long for its box..." and names them. The PDF is unchanged: values still print at full size.
+- **An offer to clear the People list after a download (TODO D21, small part).** The same note in the People card says the list stays in this browser until it is cleared, with "Clear the People list" (which asks first, as "Clear all" does) and "Keep it". The list is never cleared on its own. Moving the list out of browser storage is still a later item.
+- **An "ID number" field type (TODO D20).** Next to Text, Amount and Date in Field settings (choosing the type by hand already existed). It warns, never blocks, when a value does not look like a Mauritian ID number (a letter, then 13 letters or digits; spaces and small letters are fine) and says a passport number is fine. It prints exactly what was typed. A new box named "NIC", "National ID", "ID number" or "ID No" gets this type; a box named just "ID" stays Text.
+
 # Future work (from the v1 roadmap, archived 17 Oct 2026)
 
 The v1 build steps of `roadmap.md` (now `docs/archive/roadmap.md`) are finished. What it left for later, and where each item stands:
 
-- **Validation per field type (roadmap Step 9): not built.** The idea: mark a field as an amount, a NID or plain text (or infer it from its name), and show a warning under the input when a value does not fit, without blocking typing. A field has no type today, and values are stored and drawn exactly as typed.
+- **Validation per field type (roadmap Step 9): done.** A field is Text, Amount, Date or ID number, inferred from its name and changeable in Field settings. Amount and ID number warn under the input without blocking typing; Date prints DD/MM/YYYY. Values are stored, and except a Date, drawn exactly as typed.
 - **Fields on pages other than page 1: not built.** Other pages are copied into the output but cannot hold fields (`PAGE_NUMBER = 1` in `src/components/BoxEditor.tsx`; audit item L4).
 - **Custom font embedding (to match the MRA form's font, and to print characters the standard fonts cannot): not built.** Today a character the standard fonts cannot print is replaced with "?" in its own field and listed after the download.
 - **Audit log of generated PDFs: not built.**

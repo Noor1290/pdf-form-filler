@@ -238,7 +238,7 @@ export async function walkThrough(app, visit) {
 
   // Characters the PDF fonts cannot print: one in a listed person, one in
   // the person still in the form, and a tab.
-  await page.getByRole("button", { name: "Person 1", exact: true }).click();
+  await page.getByRole("button", { name: /^Person 1(: |$)/ }).click();
   await page.getByLabel("Surname", { exact: true }).fill("Wroński\tTest");
   await page.getByRole("button", { name: "Add & fill next person" }).click();
   await page.getByLabel("Surname", { exact: true }).fill("Łukasz");
@@ -252,7 +252,7 @@ export async function walkThrough(app, visit) {
 
   // The browser's storage full: a change that cannot be stored.
   await page.getByLabel("Surname", { exact: true }).fill("");
-  await page.getByRole("button", { name: "Person 2", exact: true }).click();
+  await page.getByRole("button", { name: /^Person 2(: |$)/ }).click();
   await readStoredTemplates(page); // gives the app time to save
   await fillStorage(page);
   await page.getByLabel("Surname", { exact: true }).fill("Sampleton-Placeholder");

@@ -276,5 +276,6 @@ export async function waitForPdfPreview(target) {
 }
 
 export async function peopleCount(target) {
-  return target.getByRole("button", { name: /^Person \d+$/ }).count();
+  // "Person 2", or "Person 2: TESTER Beta" once a name box is filled (C12).
+  return target.getByRole("button", { name: /^Person \d+(: .+)?$/ }).count();
 }

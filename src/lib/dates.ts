@@ -40,3 +40,11 @@ export function printedValue(box: FieldBox, value: string): string {
   if (box.validationType !== "date") return value;
   return formatDateDayFirst(value) ?? value;
 }
+
+// A moment shown on screen ("Last updated"), day first in this computer's
+// own time: 08/11/2026, never the browser's own order (11/8/2026).
+export function shownDate(when: Date | string): string {
+  const date = typeof when === "string" ? new Date(when) : when;
+  if (Number.isNaN(date.getTime())) return "";
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+}

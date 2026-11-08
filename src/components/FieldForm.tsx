@@ -47,6 +47,7 @@ import type { DashboardPayroll } from "@/lib/payrollHub";
 import { resizeHandleStyles } from "@/lib/rndHandleStyles";
 import { templateStore } from "@/lib/templateStore";
 import { validateFieldValue } from "@/lib/validation";
+import { peopleWithTooLongValues, personLabel, personNameBoxes } from "@/lib/people";
 import { createDragClickGuard, hasMoved } from "@/lib/dragClick";
 import { useReportUnsaved } from "@/lib/unsavedChanges";
 import type {
@@ -228,6 +229,15 @@ export function FieldForm({
   const [unprintedValues, setUnprintedValues] = useState<
     UnprintedValue[] | null
   >(null);
+  // Said in the People card after a download of several people: how many
+  // have a value too long for its box (C10), and an offer to clear the
+  // list, which is never cleared on its own (D21).
+  const [afterBatch, setAfterBatch] = useState<{
+    people: number;
+    tooLong: string[];
+    // The list's length then: once someone is added or removed, it is gone.
+    listLength: number;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -269,6 +279,11 @@ export function FieldForm({
   // rather than the order boxes were drawn in — `boxes` itself stays in
   // creation order since that's what gets saved.
   const orderedBoxes = useMemo(() => sortBoxesByPosition(boxes), [boxes]);
+  // The boxes that name a person, for the People list (C12).
+  const nameBoxes = useMemo(
+    () => personNameBoxes(orderedBoxes, template.employerFields ?? []),
+    [orderedBoxes, template.employerFields],
+  );
 
   // Measures a value as the download draws it, so a value wider than its box
   // is said beside its field (audit M16). Until the fonts are loaded, and if
@@ -610,6 +625,7 @@ export function FieldForm({
   // confirmation counts only the people who are), so they stay in the form.
   function handleClearAllEntries() {
     setEntries([]);
+    setAfterBatch(null);
     if (activeEntryId !== null) {
       setActiveEntryId(null);
       setValues(computeEmployerAutofill(boxes, template.employerFields ?? []));
@@ -686,6 +702,25 @@ export function FieldForm({
       );
       const filename = `${template.name.replace(/[^a-z0-9]+/gi, "_")}.pdf`;
       downloadPdfBytes(bytes, filename);
+      const labelOf = (entryIndex: number) =>
+        entryIndex < entries.length
+          ? personLabel(nameBoxes, entriesValues[entryIndex], entryIndex)
+          : "The person in the form (not in the list yet)";
+      if (entries.length > 0) {
+        setAfterBatch({
+          people: entriesValues.length,
+          listLength: entries.length,
+          tooLong:
+            measureValue === null
+              ? []
+              : peopleWithTooLongValues(
+                  boxes,
+                  entriesValues,
+                  measureValue,
+                  printedValue,
+                ).map(labelOf),
+        });
+      }
 
       // A character the fonts cannot print no longer stops the download:
       // it is replaced, and the people and fields concerned are listed.
@@ -693,11 +728,7 @@ export function FieldForm({
         setUnprintedValues(
           replaced.map(({ entryIndex, boxName, characters }) => ({
             person:
-              entries.length === 0
-                ? null
-                : entryIndex < entries.length
-                  ? `Person ${entryIndex + 1}`
-                  : "The person in the form (not in the list yet)",
+              entries.length === 0 ? null : labelOf(entryIndex),
             boxName,
             characters,
           })),
@@ -984,6 +1015,52 @@ export function FieldForm({
               )}
             </div>
             <div className="flex flex-col gap-3 p-4">
+            {afterBatch && afterBatch.listLength === entries.length && (
+              <div
+                aria-live="polite"
+                data-testid="after-batch"
+                className="flex flex-col gap-2 rounded-lg border border-line p-3 text-sm text-fg"
+              >
+                <p>
+                  Downloaded: {afterBatch.people}{" "}
+                  {afterBatch.people === 1 ? "person" : "people"} in one PDF.
+                </p>
+                {afterBatch.tooLong.length > 0 && (
+                  <div className="flex flex-col gap-1 text-warn">
+                    <p className="flex items-center gap-1.5">
+                      <TriangleAlertIcon className="size-3.5 shrink-0" />
+                      {afterBatch.tooLong.length === 1
+                        ? "1 person has a value too long for its box. On the PDF it runs past the edge of the box:"
+                        : `${afterBatch.tooLong.length} people have a value too long for its box. On the PDF it runs past the edge of the box:`}
+                    </p>
+                    <ul className="list-disc pl-5">
+                      {afterBatch.tooLong.map((label) => (
+                        <li key={label}>{label}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="text-muted">
+                  The People list stays in this browser until you clear it.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConfirmingClearEntries(true)}
+                  >
+                    Clear the People list
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setAfterBatch(null)}
+                  >
+                    Keep it
+                  </Button>
+                </div>
+              </div>
+            )}
             <Button variant="outline" onClick={handleAddAndFillNext}>
               <UserPlusIcon />
               Add &amp; fill next person
@@ -1029,12 +1106,12 @@ export function FieldForm({
                           entry.id === activeEntryId ? "font-semibold" : ""
                         }`}
                       >
-                        Person {index + 1}
+                        {personLabel(nameBoxes, entry.id === activeEntryId ? values : entry.values, index)}
                       </button>
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        aria-label={`Delete Person ${index + 1}`}
+                        aria-label={`Delete ${personLabel(nameBoxes, entry.id === activeEntryId ? values : entry.values, index)}`}
                         onClick={() => setDeletingEntryId(entry.id)}
                       >
                         <Trash2Icon className="text-danger" />

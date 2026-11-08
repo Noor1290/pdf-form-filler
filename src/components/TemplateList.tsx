@@ -1,3 +1,4 @@
+import { shownDate } from "@/lib/dates";
 import { useState } from "react";
 import {
   Building2Icon,
@@ -149,7 +150,7 @@ export function TemplateList({
                   </span>
                   <span className="text-sm text-muted tabular-nums">
                     Last updated{" "}
-                    {new Date(template.updatedAt).toLocaleDateString()}
+                    {shownDate(template.updatedAt)}
                   </span>
                 </span>
               </button>
