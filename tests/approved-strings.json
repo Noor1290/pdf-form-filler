@@ -247,7 +247,8 @@
     "aria-label: Delete Person 2: Sampleton",
     "text: Person 1: Testperson",
     "text: Person 2: Sampleton",
-    "text: Person 1: Wroński Test, Surname: ń line break or tab"
+    "text: Person 1: Wroński Test, Surname: ń line break or tab",
+    "text: Print with commas and 2 decimals (47752.9 prints as 47,752.90)"
   ],
   "removed": [
     "text: Statement of Emoluments Tool",
