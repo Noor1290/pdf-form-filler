@@ -205,7 +205,7 @@ export function FieldForm({
   const [exporting, setExporting] = useState(false);
   const [editingBoxId, setEditingBoxId] = useState<string | null>(null);
   // The click that ends moving a field does not open its settings.
-  const dragGuard = useMemo(createDragClickGuard, []);
+  const dragGuard = useMemo(() => createDragClickGuard(), []);
   const [confirmingClear, setConfirmingClear] = useState(false);
 
   // Which parts of this screen the browser refused to store (its storage
@@ -487,6 +487,9 @@ export function FieldForm({
   // can't be relied on to have caught up before the next click.
   useEffect(() => {
     if (activeEntryId === null) return;
+    // Keeps the list in step with the form on purpose (see above); the update
+    // returns the same list when nothing changed, so no extra render follows.
+    // oxlint-disable-next-line react/set-state-in-effect
     setEntries((current) => {
       // Already in step (a person just selected, or just restored on
       // opening): the list is left as it is, so it is not saved again.

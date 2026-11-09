@@ -1,4 +1,5 @@
 import type { FieldBox } from "@/types/template";
+import { formatAmountWithCommas } from "@/lib/amounts";
 
 // A "Date" box prints its date day first, DD/MM/YYYY, the Mauritian way —
 // whether the value came from the dashboard ("2026-08-01", how it keeps
@@ -37,6 +38,10 @@ export function formatDateDayFirst(value: string): string | null {
 // What a box prints for a value: a Date box's clear date as DD/MM/YYYY,
 // everything else exactly as it is.
 export function printedValue(box: FieldBox, value: string): string {
+  // An Amount box set to print with commas (TODO C5, see amounts.ts).
+  if (box.validationType === "amount") {
+    return box.amountCommas ? (formatAmountWithCommas(value) ?? value) : value;
+  }
   if (box.validationType !== "date") return value;
   return formatDateDayFirst(value) ?? value;
 }

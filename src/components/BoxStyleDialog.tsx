@@ -78,6 +78,18 @@ export function BoxStyleDialog({ box, onChange, onClose }: BoxStyleDialogProps) 
               "Amount" gently warns if what's typed doesn't look like a
               number — it never changes what you typed.
             </p>
+            {box.validationType === "amount" && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={box.amountCommas === true}
+                  onChange={(event) =>
+                    update("amountCommas", event.target.checked)
+                  }
+                />
+                Print with commas and 2 decimals (47752.9 prints as 47,752.90)
+              </label>
+            )}
             <p className="text-xs text-muted">
               "Date" prints a date as DD/MM/YYYY (2026-08-01 prints as
               01/08/2026). Anything that isn't clearly a date prints as it is.

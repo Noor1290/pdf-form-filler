@@ -288,11 +288,15 @@ Each has a test in `tests/audit.test.mjs` that failed before the fix.
 - **An offer to clear the People list after a download (TODO D21, small part).** The same note in the People card says the list stays in this browser until it is cleared, with "Clear the People list" (which asks first, as "Clear all" does) and "Keep it". The list is never cleared on its own. Moving the list out of browser storage is still a later item.
 - **An "ID number" field type (TODO D20).** Next to Text, Amount and Date in Field settings (choosing the type by hand already existed). It warns, never blocks, when a value does not look like a Mauritian ID number (a letter, then 13 letters or digits; spaces and small letters are fine) and says a passport number is fine. It prints exactly what was typed. A new box named "NIC", "National ID", "ID number" or "ID No" gets this type; a box named just "ID" stays Text.
 
+# Added in the cleanup, Stage 4 (9 November 2026, branch `cleanup`)
+
+- **Amounts with commas, a choice per field (payroll TODO C5, the owner's choice).** An Amount field has "Print with commas and 2 decimals (47752.9 prints as 47,752.90)" in Field settings, off unless ticked; every template saved before prints as it did. Only what is printed changes (preview and PDF), never what was typed or imported. Nothing is rounded: a value with more than two decimals, or that is not clearly one number, prints exactly as typed. (`src/lib/amounts.ts`; test "C5: ..." in `tests/audit.test.mjs`, which failed before.)
+
 # Future work (from the v1 roadmap, archived 17 Oct 2026)
 
 The v1 build steps of `roadmap.md` (now `docs/archive/roadmap.md`) are finished. What it left for later, and where each item stands:
 
-- **Validation per field type (roadmap Step 9): done.** A field is Text, Amount, Date or ID number, inferred from its name and changeable in Field settings. Amount and ID number warn under the input without blocking typing; Date prints DD/MM/YYYY. Values are stored, and except a Date, drawn exactly as typed.
+- **Validation per field type (roadmap Step 9): done.** A field is Text, Amount, Date or ID number, inferred from its name and changeable in Field settings. Amount and ID number warn under the input without blocking typing; Date prints DD/MM/YYYY. Values are stored, and except a Date (and an Amount set to print with commas), drawn exactly as typed.
 - **Fields on pages other than page 1: not built.** Other pages are copied into the output but cannot hold fields (`PAGE_NUMBER = 1` in `src/components/BoxEditor.tsx`; audit item L4).
 - **Custom font embedding (to match the MRA form's font, and to print characters the standard fonts cannot): not built.** Today a character the standard fonts cannot print is replaced with "?" in its own field and listed after the download.
 - **Audit log of generated PDFs: not built.**

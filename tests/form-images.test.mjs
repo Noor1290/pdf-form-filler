@@ -932,7 +932,7 @@ test("a layout is saved in this browser: the boxes (page, place, size, limit) an
   await page.getByText("2 boxes, for 2 pages").waitFor();
   const stored = JSON.parse(await page.evaluate((key) => localStorage.getItem(key), LAYOUTS_KEY));
   assert.deepEqual(
-    stored.map(({ savedAt: _, ...layout }) => layout),
+    stored.map((layout) => Object.fromEntries(Object.entries(layout).filter(([key]) => key !== "savedAt"))),
     [
       {
         name: "Form TM 1",

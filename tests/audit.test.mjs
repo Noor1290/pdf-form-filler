@@ -995,6 +995,50 @@ test("Date box: YYYY-MM-DD and DD/MM/YYYY both print DD/MM/YYYY; anything else p
   await context.close();
 });
 
+// ============================================================ Amounts with commas (C5)
+
+// An Amount box ticked "Print with commas and 2 decimals" prints 47752.9 as
+// 47,752.90. Off unless ticked: an Amount box without it, and every template
+// saved before, prints exactly as typed. Nothing is rounded; anything that is
+// not clearly one number prints as it is; the values kept are never changed.
+const AMOUNT_BOXES = [
+  box("b-id", "ID", 60, 80, 120, 20),
+  box("b-pay", "Net Pay", 60, 120, 160, 20, { validationType: "amount", amountCommas: true }),
+  box("b-tax", "Tax Amount", 60, 160, 160, 20, { validationType: "amount" }),
+];
+
+test("C5: an Amount box set to print with commas prints 47,752.90; one not set prints as typed; nothing is rounded", TIMEOUT, async () => {
+  const pdf = await blankForm();
+  const { context, page } = await openApp([template(pdf, { boxes: AMOUNT_BOXES })]);
+  await openFillScreen(page, "TEST Form");
+  const rows = [
+    { ID: "TST001", "Net Pay": "47752.9", "Tax Amount": "47752.9" },
+    { ID: "TST002", "Net Pay": "1234567", "Tax Amount": "1234567" },
+    { ID: "TST003", "Net Pay": "-500.5" },
+    { ID: "TST004", "Net Pay": "47,752.9" },
+    { ID: "TST005", "Net Pay": "12.345" },
+    { ID: "TST006", "Net Pay": "about 5k" },
+    { ID: "TST007", "Net Pay": "0" },
+  ];
+  await importFile(page, "test-people.json", JSON.stringify(rows));
+  const pages = pageTexts(await readVisualText((await download(page)).bytes));
+  assert.deepEqual(pages, [
+    ["TST001", "47,752.90", "47752.9"],
+    ["TST002", "1,234,567.00", "1234567"],
+    ["TST003", "-500.50"],
+    ["TST004", "47,752.90"],
+    ["TST005", "12.345"],
+    ["TST006", "about 5k"],
+    ["TST007", "0.00"],
+  ]);
+  const [stored] = await readStoredTemplates(page);
+  assert.deepEqual(
+    stored.entries.map((e) => e.values["b-pay"]),
+    ["47752.9", "1234567", "-500.5", "47,752.9", "12.345", "about 5k", "0"],
+  );
+  await context.close();
+});
+
 test("Date box: data delivered by the dashboard (YYYY-MM-DD) prints DD/MM/YYYY", TIMEOUT, async () => {
   const pdf = await blankForm();
   const { context } = await app.newContext();

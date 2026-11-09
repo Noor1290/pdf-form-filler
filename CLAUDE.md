@@ -58,7 +58,8 @@ this daily. Every screen must be understandable without instructions:
   JSON, not from constants in code.
 - Money/amount fields are stored and rendered as strings the user typed
   unless we explicitly add parsing — do not silently reformat or round
-  values.
+  values. The one explicit exception is an Amount field ticked "Print with
+  commas and 2 decimals" (off by default, never rounds; `src/lib/amounts.ts`).
 - Do not invent MRA field names or form structure. If unsure what a field
   is called, ask, don't guess.
 - Don't touch files outside the current task/step.

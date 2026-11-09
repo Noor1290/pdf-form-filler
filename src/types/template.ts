@@ -14,6 +14,9 @@ export type FieldBox = {
   // Older saved templates predate this field, so treat a missing value the
   // same as "text" everywhere it's read rather than assuming it's set.
   validationType?: "text" | "amount" | "date" | "idNumber";
+  // An Amount box only: print "47752.9" as "47,752.90" (see amounts.ts).
+  // Missing, as on every template saved before, means print as typed.
+  amountCommas?: boolean;
 };
 
 export type Template = {
