@@ -34,6 +34,7 @@ import {
   sharpeningDone,
 } from "./helpers/form-images-tool.mjs";
 import { walkThrough } from "./helpers/walkthrough.mjs";
+import { buttonsOutside, WIDTHS } from "./helpers/overflow.mjs";
 
 // ---------------------------------------------------------------- in-page
 
@@ -241,6 +242,17 @@ async function inspect(target, state) {
   const names = await target.evaluate(controlsWithoutAName);
   report.names.total += names.total;
   for (const html of names.unnamed) report.names.unnamed.push(`[${state}] ${html}`);
+  // Hotfix 4: at every width, no button lies outside its card, panel or dialog.
+  const page = typeof target.page === "function" ? target.page() : target;
+  const size = page.viewportSize();
+  for (const width of WIDTHS) {
+    await page.setViewportSize({ width, height: size.height });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    for (const line of await target.evaluate(buttonsOutside)) {
+      report.problems.push(`button outside its card or window [${state}] ${width} px: ${line}`);
+    }
+  }
+  await page.setViewportSize(size);
 }
 
 // Inside a dialog, start from wherever the dialog put the focus.
